@@ -1,0 +1,15 @@
+{
+    "IRFile1": "input/demo.ll",
+    "IRFile2": "input/demo1.ll",
+    "targetFunction": "usep",
+    "drawCFG": true,
+    "Severity": {
+        "none": false,
+        "fatal": true,
+        "error": false,
+        "warning": false,
+        "info": false,
+        "debug": false,
+        "verbose": false
+    }
+}

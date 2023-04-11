@@ -1,0 +1,3 @@
+digraph "CFG for'main' function" {
+	BB0 [shape=record, label="{BB0:\l20:18   %1 = tail call i32 @usep(), !dbg !38, !range !39\l 20:3   %2 = tail call i32 (ptr, ...) @printf(ptr noundef nonnull @.str.3, i32 noundef %1), !dbg !40\l 21:3   ret i32 0, !dbg !41\l }"];
+}
