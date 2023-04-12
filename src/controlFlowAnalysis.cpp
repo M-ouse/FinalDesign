@@ -1,5 +1,6 @@
 #include "controlFlowAnalysis.h"
 #include "common.h"
+#include "third_party/plog/Log.h"
 #include "llvm/IR/Value.h"
 #include <iomanip>
 #include <llvm-15/llvm/IR/BasicBlock.h>
@@ -422,12 +423,12 @@ void inconsistencyAnalysis::diffCallInstanceInBB(
         PLOG_DEBUG_IF(gConfig.severity.debug) << "\n";
       }
     }
-    PLOG_DEBUG_IF(gConfig.severity.debug) << "\n";
   }
 
   // debug output end
 
   // compare call instruction
+
 
   for (int bb = 0; bb < maxModule1FuncBBId; bb++) {
     if (info1.pCallInfo->find(bb) != info1.pCallInfo->end() &&
@@ -437,26 +438,8 @@ void inconsistencyAnalysis::diffCallInstanceInBB(
         std::vector<llvm::StringRef> callList1 = info1.pCallInfo->at(bb);
         std::vector<llvm::StringRef> callList2 = info2.pCallInfo->at(matchBB);
 
-        /*test for inst to line START*/ /*
-        std::vector<void *> instList1 = info1.pCallInfo2->at(bb); // inst vector
-        std::vector<void *> instList2 = info2.pCallInfo2->at(matchBB);
-
-        for (auto iter = instList1.begin(); iter != instList1.end();
-             iter++) { // get inst
-          llvm::Instruction *inst = (llvm::Instruction *)*iter;
-          llvm::CallInst *callInst = dyn_cast<llvm::CallInst>(inst);
-          llvm::Function *calledFunc = callInst->getCalledFunction();
-
-          std::map<void *, int> *_t = info1.pInstance2line;
-          unsigned int line = (*_t)[inst];
-
-          PLOG_FATAL_IF(gConfig.severity.fatal)
-              << "Func name: " << calledFunc->getName() << " "
-              << "line： " << line;
-        }*/
-
         auto printLine = [](std::vector<void *> instList,
-                            AnalyzedControlFlowInfo info, std::string module) {
+                            AnalyzedControlFlowInfo info, std::string module, int bb) {
           for (auto iter = instList.begin(); iter != instList.end();
                iter++) { // get inst
             llvm::Instruction *inst = (llvm::Instruction *)*iter;
@@ -468,17 +451,92 @@ void inconsistencyAnalysis::diffCallInstanceInBB(
 
             PLOG_FATAL_IF(gConfig.severity.fatal)
                 << "Module: " << module << " "
-                << "Func name: " << calledFunc->getName() << " "
+                << "BB: " << bb << " "
+                << "Func: " << calledFunc->getName() << " "
                 << "line: " << line;
           }
         };
 
         std::vector<void *> instList1 = info1.pCallInfo2->at(bb);
         std::vector<void *> instList2 = info2.pCallInfo2->at(matchBB);
-        printLine(instList1, info1, "M1");
-        printLine(instList2, info2, "M2");
+        // printLine(instList1, info1, "M1", bb);
+        // printLine(instList2, info2, "M2", matchBB);
         /*test for inst to line END*/
 
+        auto dumpLine = [](std::vector<void *> instList,
+                           AnalyzedControlFlowInfo info, int index){
+          llvm::Instruction *inst = (llvm::Instruction *)instList[index];
+          std::map<void *, int> *_t = info.pInstance2line;
+          unsigned int line = (*_t)[inst];
+          return line;
+        };
+
+        
+        int len1 = instList1.size(),len2 = instList2.size();
+        int endIndex1 = 0,startIndex1 = 0;
+        int endIndex2 = 0,startIndex2 = 0;
+        std::vector<std::vector<int>> dp(len1 + 1, std::vector<int>(len2 + 1, 0));
+        for (int i = 1; i <= len1; ++i) {
+          for (int j = 1; j <= len2; ++j) {
+
+            llvm::Instruction *inst1 = (llvm::Instruction *)instList1[i-1];
+            llvm::Instruction *inst2 = (llvm::Instruction *)instList2[j-1];
+            llvm::CallInst *callInst1 = dyn_cast<llvm::CallInst>(inst1);
+            llvm::CallInst *callInst2 = dyn_cast<llvm::CallInst>(inst2);
+            llvm::Function *calledFunc1 = callInst1->getCalledFunction();
+            llvm::Function *calledFunc2 = callInst2->getCalledFunction();
+            if (calledFunc1->getName() == calledFunc2->getName()) {
+              dp[i][j] = dp[i - 1][j - 1] + 1;
+              endIndex1 = i-1;
+              endIndex2 = j-1;
+            } else {
+              dp[i][j] = std::max(dp[i - 1][j], dp[i][j - 1]);
+            }
+          }
+        }
+        int lcs = dp[len1][len2];
+
+        float ratio = 2.0 * lcs / (len1 + len2);
+        startIndex1 = endIndex1 - lcs + 1;
+        startIndex2 = endIndex2 - lcs + 1;
+
+        if (ratio != 1.0) {
+
+          if (endIndex1 == 0){
+
+            PLOG_FATAL_IF(gConfig.severity.fatal) << "Inconsistent occurs in M1 at line: "
+                                                  << dumpLine(instList1, info1, 0);
+          }
+
+          if (endIndex2 == 0){
+             PLOG_FATAL_IF(gConfig.severity.fatal) << "Inconsistent occurs in M2 at line: "
+                                                  << dumpLine(instList1, info1, 0);
+          }
+
+          if (endIndex1 != 0 && endIndex2 != 0){
+
+            for(int i = 0; i < len1; i++){
+              if (i >= startIndex1 && i <= endIndex1) continue;
+              PLOG_FATAL_IF(gConfig.severity.fatal) << "Inconsistent occurs in M1 at line: "
+                                                    << dumpLine(instList1, info1, i);
+            }
+
+            for(int i = 0; i < len2; i++){
+              if (i >= startIndex2 && i <= endIndex2) continue;
+              PLOG_FATAL_IF(gConfig.severity.fatal) << "Inconsistent occurs in M2 at line: "
+                                                    << dumpLine(instList2, info2, i);
+            }
+
+          }
+
+          PLOG_DEBUG_IF(gConfig.severity.debug) << "BB" << bb 
+                                              << ", BB" << matchBB
+                                              << ", lcs:" << lcs << ", ratio:" << ratio
+                                              << ", startIndex1:" << startIndex1 << ", endIndex1:" << endIndex1
+                                              << ", startIndex2:" << startIndex2 << ", endIndex2:" << endIndex2;
+        }
+
+        /*
         auto callListToSeq = [](std::vector<llvm::StringRef> callList) {
           std::string seq;
           for (auto iter = callList.begin(); iter != callList.end(); iter++) {
@@ -503,10 +561,12 @@ void inconsistencyAnalysis::diffCallInstanceInBB(
           // errs() << "inconsistency occurs at " << pBB->getDebugLoc() <<
           // "\n";
         }
+        */
         // }
       }
     }
   }
+
 }
 
 } // namespace llvm
