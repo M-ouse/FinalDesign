@@ -81,18 +81,18 @@ public:
   Result run(Function &F, FunctionAnalysisManager &AM);
 };
 
-class inconsistencyAnalysis {
+class controlFlowInconsistencyAnalysis {
   std::map<int, std::pair<int, float>> matchMap;
 
 public:
-  void inconsistencyAnalysisWrapper(std::vector<AnalyzedControlFlowInfo> *,
+  void Wrapper(std::vector<AnalyzedControlFlowInfo> *,
                                     std::vector<AnalyzedControlFlowInfo> *,
                                     StringRef);
   void match(AnalyzedControlFlowInfo, AnalyzedControlFlowInfo);
   float seqLCS(std::string, std::string);
   void dumpMatchMap();
   void diffCallInstanceInBB(AnalyzedControlFlowInfo, AnalyzedControlFlowInfo);
-  inconsistencyAnalysis() = default;
+  controlFlowInconsistencyAnalysis() = default;
 };
 
 } // namespace llvm

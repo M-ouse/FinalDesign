@@ -259,7 +259,7 @@ ControlFlow::Result ControlFlow::run(Function &F, FunctionAnalysisManager &AM) {
   return Result;
 }
 
-void inconsistencyAnalysis::inconsistencyAnalysisWrapper(
+void controlFlowInconsistencyAnalysis::Wrapper(
     std::vector<AnalyzedControlFlowInfo> *IRFile1FuncAnalysis,
     std::vector<AnalyzedControlFlowInfo> *IRFIle2FuncAnalysis,
     StringRef targetFunc) {
@@ -279,7 +279,7 @@ void inconsistencyAnalysis::inconsistencyAnalysisWrapper(
   }
 }
 
-void inconsistencyAnalysis::match(AnalyzedControlFlowInfo info1,
+void controlFlowInconsistencyAnalysis::match(AnalyzedControlFlowInfo info1,
                                   AnalyzedControlFlowInfo info2) {
   PLOG_DEBUG_IF(gConfig.severity.debug)
       << "Matching " << info1.pF->getName() << "\n";
@@ -351,7 +351,7 @@ void inconsistencyAnalysis::match(AnalyzedControlFlowInfo info1,
   delete _reverseMatchMap;
 }
 
-float inconsistencyAnalysis::seqLCS(std::string seq1, std::string seq2) {
+float controlFlowInconsistencyAnalysis::seqLCS(std::string seq1, std::string seq2) {
 
   int len1 = seq1.length(), len2 = seq2.length();
   std::vector<std::vector<int>> dp(len1 + 1, std::vector<int>(len2 + 1, 0));
@@ -369,7 +369,7 @@ float inconsistencyAnalysis::seqLCS(std::string seq1, std::string seq2) {
   // errs() << instruction << "\n";
 }
 
-void inconsistencyAnalysis::dumpMatchMap() {
+void controlFlowInconsistencyAnalysis::dumpMatchMap() {
   for (auto it = matchMap.begin(); it != matchMap.end(); it++) {
     PLOG_DEBUG_IF(gConfig.severity.debug)
         << "BB" << it->first << "-"
@@ -378,7 +378,7 @@ void inconsistencyAnalysis::dumpMatchMap() {
   }
 }
 
-void inconsistencyAnalysis::diffCallInstanceInBB(
+void controlFlowInconsistencyAnalysis::diffCallInstanceInBB(
     AnalyzedControlFlowInfo info1, AnalyzedControlFlowInfo info2) {
   // errs() << "diffCallInstance " << info1.pF->getName() << "\n";
   PLOG_INFO_IF(gConfig.severity.info) << "diffCallInstance ... ..."

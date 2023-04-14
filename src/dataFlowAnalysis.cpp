@@ -11,7 +11,7 @@
 namespace llvm {
 
 /*
-std::string drawDFG::changeIns2Str(Instruction *ins) {
+std::string DataFlow::changeIns2Str(Instruction *ins) {
   std::string temp_str;
   raw_string_ostream os(temp_str);
   ins->print(os);
@@ -19,7 +19,7 @@ std::string drawDFG::changeIns2Str(Instruction *ins) {
 }
 */
 
-StringRef drawDFG::getValueName(Value *v) {
+StringRef DataFlow::Analysis::getValueName(Value *v) {
   std::string temp_result = "val";
   if (!v) {
     return "undefined";
@@ -35,7 +35,7 @@ StringRef drawDFG::getValueName(Value *v) {
   return result;
 }
 
-std::string drawDFG::EscapeString(const std::string &Label) {
+std::string DataFlow::Analysis::EscapeString(const std::string &Label) {
   std::string Str(Label);
   for (unsigned i = 0; i != Str.length(); ++i)
     switch (Str[i]) {
@@ -76,7 +76,7 @@ std::string drawDFG::EscapeString(const std::string &Label) {
   return Str;
 }
 
-bool drawDFG::drawDataFlowGraph(Function &F) {
+bool DataFlow::Analysis::drawDataFlowGraph(Function &F) {
   std::error_code error;
   std::string filename = (F.getName() + "_DFG" + ".dot").str();
   raw_fd_ostream file(filename, error, sys::fs::OF_Text);
@@ -180,10 +180,20 @@ bool drawDFG::drawDataFlowGraph(Function &F) {
   return false;
 }
 
-AnalysisKey drawDFG::Key;
-drawDFG::Result drawDFG::run(Function &F, FunctionAnalysisManager &AM) {
-  drawDataFlowGraph(F);
-  // return drawDFG::Result();
+AnalyzedDataFlowInfo::AnalyzedDataFlowInfo(Function &F){
+  valid = false;
+}
+
+AnalysisKey DataFlow::Key;
+DataFlow::Result DataFlow::run(Function &F, FunctionAnalysisManager &AM) {
+
+  AnalyzedDataFlowInfo Result = AnalyzedDataFlowInfo(F);
+
+  Analysis *A = new Analysis();
+
+  A->drawDataFlowGraph(F);
+
+  return Result;
 }
 
 } // namespace llvm

@@ -64,7 +64,6 @@ int main(int argc, const char *argv[]) {
     Err.print(InputBitcode2.c_str(), errs());
     return -1;
   }
-  // pasre config
 
   // build pass manager
   LoopAnalysisManager LAM;
@@ -72,13 +71,12 @@ int main(int argc, const char *argv[]) {
   CGSCCAnalysisManager CGAM;
   ModuleAnalysisManager MAM;
   // ModulePassManager MPM;
-
   PassBuilder PB;
 
   FAM.registerPass([&] { return DependenceAnalysis(); });
   FAM.registerPass([&] { return BasicAA(); });
   FAM.registerPass([&] { return ControlFlow(); });
-  FAM.registerPass([&] { return drawDFG(); });
+  FAM.registerPass([&] { return DataFlow(); });
   // FAM.registerPass([&] {return LongestPathAnalysis();});
   // MAM.registerPass([&] {return FunctionPairingAnalysis();});
 
@@ -92,55 +90,45 @@ int main(int argc, const char *argv[]) {
   auto FPM = PB.buildFunctionSimplificationPipeline(llvm::OptimizationLevel::O2,
                                                     ThinOrFullLTOPhase::None);
   // FPM.addPass(EHPairingWarpperPass());
-
   // MPM.addPass(PairingWrapper());
-
   // MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
-
   // MPM.addPass(EHPairingWarpperPass());
   // MPM.run(*M, MAM);
 
   std::vector<AnalyzedControlFlowInfo> *IRFile1FuncAnalysis =
       new std::vector<AnalyzedControlFlowInfo>();
-  std::vector<AnalyzedControlFlowInfo> *IRFIle2FuncAnalysis =
+  std::vector<AnalyzedControlFlowInfo> *IRFile2FuncAnalysis =
       new std::vector<AnalyzedControlFlowInfo>();
   // PLOG(plog::debug) << "Hello log!"; // function-style macro
 
-  PLOG_INFO_IF(gConfig.severity.info)
-      << "Resolve " << M1->getName() << " ... ...\n";
-  gCurrentModule = M1->getName().str();
-  for (Function &F : *M1) {
-    // FAM.getResult<ControlFlow>(F);
-    if (!F.isDeclaration()) {
-      PLOG_DEBUG_IF(gConfig.severity.debug)
-          << "Run FAM in " << F.getName() << "\n";
-      AnalyzedControlFlowInfo res = FAM.getResult<ControlFlow>(F);
-      if (res.valid) {
-        IRFile1FuncAnalysis->push_back(res);
-      }
-    }
-  }
+  auto getControlFlowAnalysisResult =
+      [&FAM](std::unique_ptr<Module> &M,
+             std::vector<AnalyzedControlFlowInfo> *IRFileFuncAnalysis) {
+        PLOG_INFO_IF(gConfig.severity.info)
+            << "Resolve " << M->getName() << " ... ...\n";
+        gCurrentModule = M->getName().str();
+        for (Function &F : *M) {
+          // FAM.getResult<ControlFlow>(F);
+          if (!F.isDeclaration()) {
+            PLOG_DEBUG_IF(gConfig.severity.debug)
+                << "Run FAM in " << F.getName() << "\n";
+            // AnalyzedControlFlowInfo res = FAM.getResult<ControlFlow>(F);
+            AnalyzedControlFlowInfo res = FAM.getResult<ControlFlow>(F);
+            if (res.valid) {
+              IRFileFuncAnalysis->push_back(res);
+            }
+          }
+        }
+      };
 
-  PLOG_INFO_IF(gConfig.severity.info)
-      << "Resolve " << M2->getName() << " ... ...\n";
-  gCurrentModule = M2->getName().str();
-  for (Function &F : *M2) {
-    // FAM.getResult<ControlFlow>(F);
-    if (!F.isDeclaration()) {
-      PLOG_DEBUG_IF(gConfig.severity.debug)
-          << "Run FAM in " << F.getName() << "\n";
-      AnalyzedControlFlowInfo res = FAM.getResult<ControlFlow>(F);
-      if (res.valid) {
-        IRFIle2FuncAnalysis->push_back(res);
-      }
-    }
-  }
+  getControlFlowAnalysisResult(M1, IRFile1FuncAnalysis);
+  getControlFlowAnalysisResult(M2, IRFile2FuncAnalysis);
 
   PLOG_INFO_IF(gConfig.severity.info) << "Starting Basicblock match"
                                       << " ... ...\n";
-  inconsistencyAnalysis *result = new inconsistencyAnalysis();
+  controlFlowInconsistencyAnalysis *result =
+      new controlFlowInconsistencyAnalysis();
   StringRef targetFunc = gConfig.targetFunction;
-  result->inconsistencyAnalysisWrapper(IRFile1FuncAnalysis, IRFIle2FuncAnalysis,
-                                       targetFunc);
+  result->Wrapper(IRFile1FuncAnalysis, IRFile2FuncAnalysis, targetFunc);
   return 0;
 }

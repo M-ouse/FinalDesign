@@ -8,7 +8,7 @@
         "fatal": true,
         "error": false,
         "warning": false,
-        "info": false,
+        "info": true,
         "debug": false,
         "verbose": false
     }
