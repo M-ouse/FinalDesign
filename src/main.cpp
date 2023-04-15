@@ -43,6 +43,79 @@ using namespace llvm;
 sConfig gConfig;
 std::string gCurrentModule;
 
+bool doControlFlowAnalysis(FunctionAnalysisManager &FAM,
+                           std::unique_ptr<Module> &M1,
+                           std::unique_ptr<Module> &M2) {
+  std::vector<AnalyzedControlFlowInfo> *IRFile1FuncAnalysis =
+      new std::vector<AnalyzedControlFlowInfo>();
+  std::vector<AnalyzedControlFlowInfo> *IRFile2FuncAnalysis =
+      new std::vector<AnalyzedControlFlowInfo>();
+  // PLOG(plog::debug) << "Hello log!"; // function-style macro
+
+  auto getControlFlowAnalysisResult =
+      [&FAM](std::unique_ptr<Module> &M,
+             std::vector<AnalyzedControlFlowInfo> *IRFileFuncAnalysis) {
+        PLOG_INFO_IF(gConfig.severity.info)
+            << "Resolve " << M->getName() << " ... ...";
+        gCurrentModule = M->getName().str();
+        for (Function &F : *M) {
+          // FAM.getResult<ControlFlow>(F);
+          if (!F.isDeclaration()) {
+            PLOG_DEBUG_IF(gConfig.severity.debug)
+                << "Run FAM in " << F.getName();
+            // AnalyzedControlFlowInfo res = FAM.getResult<ControlFlow>(F);
+            AnalyzedControlFlowInfo res = FAM.getResult<ControlFlow>(F);
+            if (res.valid) {
+              IRFileFuncAnalysis->push_back(res);
+            }
+          }
+        }
+      };
+
+  getControlFlowAnalysisResult(M1, IRFile1FuncAnalysis);
+  getControlFlowAnalysisResult(M2, IRFile2FuncAnalysis);
+
+  PLOG_INFO_IF(gConfig.severity.info) << "Starting Basicblock match"
+                                      << " ... ...";
+  controlFlowInconsistencyAnalysis *result =
+      new controlFlowInconsistencyAnalysis();
+  StringRef targetFunc = gConfig.targetFunction;
+  result->Wrapper(IRFile1FuncAnalysis, IRFile2FuncAnalysis, targetFunc);
+
+  return true;
+}
+
+bool doDataFlowAnalysis(FunctionAnalysisManager &FAM,
+                        std::unique_ptr<Module> &M1,
+                        std::unique_ptr<Module> &M2) {
+  std::vector<AnalyzedDataFlowInfo> *IRFile1FuncAnalysis =
+      new std::vector<AnalyzedDataFlowInfo>();
+  std::vector<AnalyzedDataFlowInfo> *IRFile2FuncAnalysis =
+      new std::vector<AnalyzedDataFlowInfo>();
+
+  auto getDataFlowAnalysisResult =
+      [&FAM](std::unique_ptr<Module> &M,
+             std::vector<AnalyzedDataFlowInfo> *IRFileFuncAnalysis) {
+        PLOG_INFO_IF(gConfig.severity.info)
+            << "Resolve " << M->getName() << " ... ...";
+        gCurrentModule = M->getName().str();
+        for (Function &F : *M) {
+          if (!F.isDeclaration()) {
+            PLOG_DEBUG_IF(gConfig.severity.debug)
+                << "Run FAM in " << F.getName();
+            AnalyzedDataFlowInfo res = FAM.getResult<DataFlow>(F);
+            if (res.valid) {
+              IRFileFuncAnalysis->push_back(res);
+            }
+          }
+        }
+      };
+  getDataFlowAnalysisResult(M1, IRFile1FuncAnalysis);
+  getDataFlowAnalysisResult(M2, IRFile2FuncAnalysis);
+
+  return true;
+}
+
 int main(int argc, const char *argv[]) {
   SMDiagnostic Err;
   LLVMContext *LLVMCtx = new LLVMContext();
@@ -94,41 +167,10 @@ int main(int argc, const char *argv[]) {
   // MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
   // MPM.addPass(EHPairingWarpperPass());
   // MPM.run(*M, MAM);
+  if (gConfig.AnalysisCFG)
+    doControlFlowAnalysis(FAM, M1, M2);
+  if (gConfig.AnalysisDFG)
+    doDataFlowAnalysis(FAM, M1, M2);
 
-  std::vector<AnalyzedControlFlowInfo> *IRFile1FuncAnalysis =
-      new std::vector<AnalyzedControlFlowInfo>();
-  std::vector<AnalyzedControlFlowInfo> *IRFile2FuncAnalysis =
-      new std::vector<AnalyzedControlFlowInfo>();
-  // PLOG(plog::debug) << "Hello log!"; // function-style macro
-
-  auto getControlFlowAnalysisResult =
-      [&FAM](std::unique_ptr<Module> &M,
-             std::vector<AnalyzedControlFlowInfo> *IRFileFuncAnalysis) {
-        PLOG_INFO_IF(gConfig.severity.info)
-            << "Resolve " << M->getName() << " ... ...\n";
-        gCurrentModule = M->getName().str();
-        for (Function &F : *M) {
-          // FAM.getResult<ControlFlow>(F);
-          if (!F.isDeclaration()) {
-            PLOG_DEBUG_IF(gConfig.severity.debug)
-                << "Run FAM in " << F.getName() << "\n";
-            // AnalyzedControlFlowInfo res = FAM.getResult<ControlFlow>(F);
-            AnalyzedControlFlowInfo res = FAM.getResult<ControlFlow>(F);
-            if (res.valid) {
-              IRFileFuncAnalysis->push_back(res);
-            }
-          }
-        }
-      };
-
-  getControlFlowAnalysisResult(M1, IRFile1FuncAnalysis);
-  getControlFlowAnalysisResult(M2, IRFile2FuncAnalysis);
-
-  PLOG_INFO_IF(gConfig.severity.info) << "Starting Basicblock match"
-                                      << " ... ...\n";
-  controlFlowInconsistencyAnalysis *result =
-      new controlFlowInconsistencyAnalysis();
-  StringRef targetFunc = gConfig.targetFunction;
-  result->Wrapper(IRFile1FuncAnalysis, IRFile2FuncAnalysis, targetFunc);
   return 0;
 }

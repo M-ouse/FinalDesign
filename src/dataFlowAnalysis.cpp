@@ -1,23 +1,24 @@
 #include "dataFlowAnalysis.h"
+#include "common.h"
+#include "third_party/plog/Log.h"
 #include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/Value.h"
+#include "llvm/IR/ValueSymbolTable.h"
+#include <cstddef>
+#include <llvm-15/llvm/ADT/StringRef.h>
+#include <llvm-15/llvm/IR/Instruction.h>
+#include <llvm-15/llvm/IR/Value.h>
 #include <llvm/Analysis/BasicAliasAnalysis.h>
 #include <llvm/IR/CFG.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/IR/Metadata.h>
 #include <llvm/IR/PassManager.h>
 #include <llvm/Support/raw_ostream.h>
 #include <queue>
+#include <regex>
 
 namespace llvm {
-
-/*
-std::string DataFlow::changeIns2Str(Instruction *ins) {
-  std::string temp_str;
-  raw_string_ostream os(temp_str);
-  ins->print(os);
-  return os.str();
-}
-*/
 
 StringRef DataFlow::Analysis::getValueName(Value *v) {
   std::string temp_result = "val";
@@ -30,6 +31,7 @@ StringRef DataFlow::Analysis::getValueName(Value *v) {
   } else {
     temp_result = v->getName().str();
   }
+  // PLOG_DEBUG_IF(gConfig.severity.debug) << "getValueName: " << temp_result;
   StringRef result(temp_result);
   // errs() << result;
   return result;
@@ -76,11 +78,38 @@ std::string DataFlow::Analysis::EscapeString(const std::string &Label) {
   return Str;
 }
 
+bool DataFlow::Analysis::test(Instruction *I, Function &F) {
+
+  unsigned lineNum = 0;
+  unsigned colNum = 0;
+  const DebugLoc &location = I->getDebugLoc();
+  if (location) {
+    lineNum = location.getLine();
+    colNum = location.getCol();
+  }
+
+  std::string _t;
+      DbgValueInst *dbgVal = dyn_cast<DbgValueInst>(I);
+      if (dbgVal) {
+        DILocalVariable *var = dbgVal->getVariable();
+        if (var) {
+          std::string varName = var->getName().str();
+          llvm::raw_string_ostream(_t) << *I;
+          errs() << varName << " " << lineNum << " " << colNum << "\n";
+        }
+      }
+
+  return false;
+}
+
 bool DataFlow::Analysis::drawDataFlowGraph(Function &F) {
+  PLOG_INFO_IF(gConfig.severity.info) << "Drawing DFG for " << F.getName();
   std::error_code error;
-  std::string filename = (F.getName() + "_DFG" + ".dot").str();
-  raw_fd_ostream file(filename, error, sys::fs::OF_Text);
-  // errs() << "Hello\n";
+  std::string _module =
+      std::regex_replace(gCurrentModule, std::regex("input"), "output");
+  std::string Filename = _module + ("_" + F.getName() + "_DFG" + ".dot").str();
+  raw_fd_ostream file(Filename, error, sys::fs::OF_Text);
+
   edges.clear();
   nodes.clear();
   inst_edges.clear();
@@ -89,7 +118,7 @@ bool DataFlow::Analysis::drawDataFlowGraph(Function &F) {
     for (BasicBlock::iterator II = curBB->begin(), IEnd = curBB->end();
          II != IEnd; ++II) {
       Instruction *curII = &*II;
-      // errs() << getValueName(curII) << "\n";
+
       switch (curII->getOpcode()) {
       // 由于load和store对内存进行操作，需要对load指令和stroe指令单独进行处理
       case llvm::Instruction::Load: {
@@ -110,6 +139,7 @@ bool DataFlow::Analysis::drawDataFlowGraph(Function &F) {
         break;
       }
       default: {
+        test(curII,F);
         for (Instruction::op_iterator op = curII->op_begin(),
                                       opEnd = curII->op_end();
              op != opEnd; ++op) {
@@ -123,7 +153,7 @@ bool DataFlow::Analysis::drawDataFlowGraph(Function &F) {
       }
       }
       BasicBlock::iterator next = II;
-      // errs() << curII << "\n";
+
       nodes.push_back(node(curII, getValueName(curII)));
       ++next;
       if (next != IEnd) {
@@ -139,9 +169,9 @@ bool DataFlow::Analysis::drawDataFlowGraph(Function &F) {
                                 node(first, getValueName(first))));
     }
   }
-  // errs() << "Write\n";
+
   file << "digraph \"DFG for'" + F.getName() + "\' function\" {\n";
-  // errs() << "Write DFG\n";
+
   // 将node节点dump
   for (node_list::iterator node = nodes.begin(), node_end = nodes.end();
        node != node_end; ++node) {
@@ -158,7 +188,7 @@ bool DataFlow::Analysis::drawDataFlowGraph(Function &F) {
            << instruction << "\"];\n";
     }
   }
-  // errs() << "Write Done\n";
+
   // 将inst_edges边dump
   for (edge_list::iterator edge = inst_edges.begin(),
                            edge_end = inst_edges.end();
@@ -174,15 +204,13 @@ bool DataFlow::Analysis::drawDataFlowGraph(Function &F) {
     file << "\tNode" << edge->first.first << " -> Node" << edge->second.first
          << "\n";
   }
-  errs() << "DFG Write Done\n";
+  PLOG_INFO_IF(gConfig.severity.info) << "DFG Write Done";
   file << "}\n";
   file.close();
   return false;
 }
 
-AnalyzedDataFlowInfo::AnalyzedDataFlowInfo(Function &F){
-  valid = false;
-}
+AnalyzedDataFlowInfo::AnalyzedDataFlowInfo(Function &F) { valid = false; }
 
 AnalysisKey DataFlow::Key;
 DataFlow::Result DataFlow::run(Function &F, FunctionAnalysisManager &AM) {
@@ -191,7 +219,8 @@ DataFlow::Result DataFlow::run(Function &F, FunctionAnalysisManager &AM) {
 
   Analysis *A = new Analysis();
 
-  A->drawDataFlowGraph(F);
+  if (gConfig.drawDFG)
+    A->drawDataFlowGraph(F);
 
   return Result;
 }

@@ -12,7 +12,10 @@ bool sConfig::parseBasic(std::string configPath) {
   IRFile1 = config["IRFile1"];
   IRFile2 = config["IRFile2"];
   targetFunction = config["targetFunction"];
+  AnalysisCFG = config["AnalysisCFG"].get<bool>();
+  AnalysisDFG = config["AnalysisDFG"].get<bool>();
   drawCFG = config["drawCFG"].get<bool>();
+  drawDFG = config["drawDFG"].get<bool>();
 
   severity.verbose = config["Severity"]["verbose"].get<bool>();
   severity.debug = config["Severity"]["debug"].get<bool>();
@@ -25,4 +28,5 @@ bool sConfig::parseBasic(std::string configPath) {
   static plog::ConsoleAppender<plog::TxtFormatter> consoleAppender;
   plog::init(plog::debug, &consoleAppender); // Initialize the logger to console
                                              // for all project files
+  return true;
 }

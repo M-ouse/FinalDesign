@@ -9,11 +9,12 @@ target triple = "x86_64-pc-linux-gnu"
 @str.4 = private unnamed_addr constant [30 x i8] c"too small, try one more time!\00", align 1
 
 ; Function Attrs: nofree noinline nounwind uwtable
-define dso_local void @test(ptr nocapture readnone %0) local_unnamed_addr #0 !dbg !34 {
+define dso_local void @test(ptr nocapture readnone %p1) local_unnamed_addr #0 !dbg !34 {
+entry:
   call void @llvm.dbg.value(metadata ptr poison, metadata !38, metadata !DIExpression()), !dbg !39
-  %2 = tail call noalias dereferenceable_or_null(10) ptr @malloc(i64 noundef 10) #8, !dbg !40
-  call void @llvm.dbg.value(metadata ptr %2, metadata !38, metadata !DIExpression()), !dbg !39
-  %3 = tail call i32 (ptr, ...) @__isoc99_scanf(ptr noundef nonnull @.str, ptr noundef %2), !dbg !41
+  %call = tail call noalias dereferenceable_or_null(10) ptr @malloc(i64 noundef 10) #8, !dbg !40
+  call void @llvm.dbg.value(metadata ptr %call, metadata !38, metadata !DIExpression()), !dbg !39
+  %call1 = tail call i32 (ptr, ...) @__isoc99_scanf(ptr noundef nonnull @.str, ptr noundef %call), !dbg !41
   ret void, !dbg !42
 }
 
@@ -25,51 +26,52 @@ declare noundef i32 @__isoc99_scanf(ptr nocapture noundef readonly, ...) local_u
 
 ; Function Attrs: noinline nounwind uwtable
 define dso_local i32 @usep() local_unnamed_addr #3 !dbg !43 {
-  %1 = alloca i32, align 4
-  call void @llvm.lifetime.start.p0(i64 4, ptr nonnull %1) #9, !dbg !51
-  call void @llvm.dbg.value(metadata ptr %1, metadata !47, metadata !DIExpression(DW_OP_deref)), !dbg !52
-  %2 = call i32 (ptr, ...) @__isoc99_scanf(ptr noundef nonnull @.str, ptr noundef nonnull %1), !dbg !53
-  %3 = load i32, ptr %1, align 4, !dbg !54, !tbaa !56
-  call void @llvm.dbg.value(metadata i32 %3, metadata !47, metadata !DIExpression()), !dbg !52
-  %4 = icmp slt i32 %3, 10, !dbg !60
-  br i1 %4, label %5, label %8, !dbg !61
+entry:
+  %n = alloca i32, align 4
+  call void @llvm.lifetime.start.p0(i64 4, ptr nonnull %n) #9, !dbg !51
+  call void @llvm.dbg.value(metadata ptr %n, metadata !47, metadata !DIExpression(DW_OP_deref)), !dbg !52
+  %call = call i32 (ptr, ...) @__isoc99_scanf(ptr noundef nonnull @.str, ptr noundef nonnull %n), !dbg !53
+  %0 = load i32, ptr %n, align 4, !dbg !54, !tbaa !56
+  call void @llvm.dbg.value(metadata i32 %0, metadata !47, metadata !DIExpression()), !dbg !52
+  %cmp = icmp slt i32 %0, 10, !dbg !60
+  br i1 %cmp, label %if.then, label %for.body.preheader, !dbg !61
 
-5:                                                ; preds = %0
-  %6 = call i32 @puts(ptr nonnull @str.4), !dbg !62
-  call void @llvm.dbg.value(metadata ptr %1, metadata !47, metadata !DIExpression(DW_OP_deref)), !dbg !52
-  %7 = call i32 (ptr, ...) @__isoc99_scanf(ptr noundef nonnull @.str, ptr noundef nonnull %1), !dbg !64
-  br label %21, !dbg !65
+if.then:                                          ; preds = %entry
+  %puts11 = call i32 @puts(ptr nonnull @str.4), !dbg !62
+  call void @llvm.dbg.value(metadata ptr %n, metadata !47, metadata !DIExpression(DW_OP_deref)), !dbg !52
+  %call2 = call i32 (ptr, ...) @__isoc99_scanf(ptr noundef nonnull @.str, ptr noundef nonnull %n), !dbg !64
+  br label %cleanup, !dbg !65
 
-8:                                                ; preds = %0
-  %9 = zext i32 %3 to i64
-  %10 = call noalias ptr @malloc(i64 noundef %9) #8, !dbg !66
-  call void @llvm.dbg.value(metadata ptr %10, metadata !48, metadata !DIExpression()), !dbg !52
+for.body.preheader:                               ; preds = %entry
+  %conv = zext i32 %0 to i64
+  %call3 = call noalias ptr @malloc(i64 noundef %conv) #8, !dbg !66
+  call void @llvm.dbg.value(metadata ptr %call3, metadata !48, metadata !DIExpression()), !dbg !52
   call void @llvm.dbg.value(metadata i32 0, metadata !49, metadata !DIExpression()), !dbg !67
-  call void @llvm.dbg.value(metadata i32 %3, metadata !47, metadata !DIExpression()), !dbg !52
-  br label %13, !dbg !68
+  call void @llvm.dbg.value(metadata i32 %0, metadata !47, metadata !DIExpression()), !dbg !52
+  br label %for.body, !dbg !68
 
-11:                                               ; preds = %13
-  call void @free(ptr noundef %10) #9, !dbg !69
-  %12 = call i32 @puts(ptr nonnull @str), !dbg !70
-  br label %21
+for.cond.cleanup:                                 ; preds = %for.body
+  call void @free(ptr noundef %call3) #9, !dbg !69
+  %puts = call i32 @puts(ptr nonnull @str), !dbg !70
+  br label %cleanup
 
-13:                                               ; preds = %8, %13
-  %14 = phi i64 [ 0, %8 ], [ %17, %13 ]
-  call void @llvm.dbg.value(metadata i64 %14, metadata !49, metadata !DIExpression()), !dbg !67
-  %15 = getelementptr inbounds i32, ptr %10, i64 %14, !dbg !71
-  %16 = call i32 (ptr, ...) @__isoc99_scanf(ptr noundef nonnull @.str, ptr noundef %15), !dbg !73
-  %17 = add nuw nsw i64 %14, 1, !dbg !74
-  call void @llvm.dbg.value(metadata i64 %17, metadata !49, metadata !DIExpression()), !dbg !67
-  %18 = load i32, ptr %1, align 4, !dbg !75, !tbaa !56
-  call void @llvm.dbg.value(metadata i32 %18, metadata !47, metadata !DIExpression()), !dbg !52
-  %19 = sext i32 %18 to i64, !dbg !76
-  %20 = icmp slt i64 %17, %19, !dbg !76
-  br i1 %20, label %13, label %11, !dbg !68, !llvm.loop !77
+for.body:                                         ; preds = %for.body.preheader, %for.body
+  %indvars.iv = phi i64 [ 0, %for.body.preheader ], [ %indvars.iv.next, %for.body ]
+  call void @llvm.dbg.value(metadata i64 %indvars.iv, metadata !49, metadata !DIExpression()), !dbg !67
+  %arrayidx = getelementptr inbounds i32, ptr %call3, i64 %indvars.iv, !dbg !71
+  %call6 = call i32 (ptr, ...) @__isoc99_scanf(ptr noundef nonnull @.str, ptr noundef %arrayidx), !dbg !73
+  %indvars.iv.next = add nuw nsw i64 %indvars.iv, 1, !dbg !74
+  call void @llvm.dbg.value(metadata i64 %indvars.iv.next, metadata !49, metadata !DIExpression()), !dbg !67
+  %1 = load i32, ptr %n, align 4, !dbg !75, !tbaa !56
+  call void @llvm.dbg.value(metadata i32 %1, metadata !47, metadata !DIExpression()), !dbg !52
+  %2 = sext i32 %1 to i64, !dbg !76
+  %cmp4 = icmp slt i64 %indvars.iv.next, %2, !dbg !76
+  br i1 %cmp4, label %for.body, label %for.cond.cleanup, !dbg !68, !llvm.loop !77
 
-21:                                               ; preds = %11, %5
-  %22 = phi i32 [ -2, %5 ], [ -1, %11 ], !dbg !52
-  call void @llvm.lifetime.end.p0(i64 4, ptr nonnull %1) #9, !dbg !80
-  ret i32 %22, !dbg !80
+cleanup:                                          ; preds = %for.cond.cleanup, %if.then
+  %retval.0 = phi i32 [ -2, %if.then ], [ -1, %for.cond.cleanup ], !dbg !52
+  call void @llvm.lifetime.end.p0(i64 4, ptr nonnull %n) #9, !dbg !80
+  ret i32 %retval.0, !dbg !80
 }
 
 ; Function Attrs: argmemonly mustprogress nocallback nofree nosync nounwind willreturn
@@ -86,8 +88,9 @@ declare void @free(ptr allocptr nocapture noundef) local_unnamed_addr #5
 
 ; Function Attrs: noinline nounwind uwtable
 define dso_local i32 @main() local_unnamed_addr #3 !dbg !81 {
-  %1 = tail call i32 @usep(), !dbg !84, !range !85
-  %2 = tail call i32 (ptr, ...) @printf(ptr noundef nonnull @.str.3, i32 noundef %1), !dbg !86
+entry:
+  %call = tail call i32 @usep(), !dbg !84, !range !85
+  %call1 = tail call i32 (ptr, ...) @printf(ptr noundef nonnull @.str.3, i32 noundef %call), !dbg !86
   tail call void @test(ptr poison), !dbg !87
   ret i32 0, !dbg !88
 }

@@ -16,7 +16,10 @@ public:
   std::string IRFile1;
   std::string IRFile2;
   std::string targetFunction;
+  bool AnalysisCFG = false;
+  bool AnalysisDFG = false;
   bool drawCFG = false;
+  bool drawDFG = false;
   struct Severity {
     bool verbose;
     bool debug;

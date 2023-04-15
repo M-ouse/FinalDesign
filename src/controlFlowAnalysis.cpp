@@ -146,8 +146,8 @@ bool ControlFlow::Analysis::dumpCalls() {
 bool ControlFlow::Analysis::functionInfoExtractor(Function &F) { return true; }
 
 bool ControlFlow::Analysis::buildCFG(Function &F) {
-  PLOG_DEBUG_IF(gConfig.severity.debug)
-      << "buildCFG in " << F.getName() << "\n";
+  PLOG_INFO_IF(gConfig.severity.info)
+      << "buildCFG in " << F.getName();
 
   std::map<BasicBlock *, int> basicBlockMap; // block - id
 
@@ -234,7 +234,7 @@ AnalyzedControlFlowInfo::AnalyzedControlFlowInfo(Function &F) {
 AnalysisKey ControlFlow::Key;
 ControlFlow::Result ControlFlow::run(Function &F, FunctionAnalysisManager &AM) {
   PLOG_DEBUG_IF(gConfig.severity.debug)
-      << "ControlFlow::run in " << F.getName() << "\n";
+      << "ControlFlow::run in " << F.getName();
 
   AnalyzedControlFlowInfo Result = AnalyzedControlFlowInfo(F);
 
@@ -381,8 +381,7 @@ void controlFlowInconsistencyAnalysis::dumpMatchMap() {
 void controlFlowInconsistencyAnalysis::diffCallInstanceInBB(
     AnalyzedControlFlowInfo info1, AnalyzedControlFlowInfo info2) {
   // errs() << "diffCallInstance " << info1.pF->getName() << "\n";
-  PLOG_INFO_IF(gConfig.severity.info) << "diffCallInstance ... ..."
-                                      << "\n";
+  PLOG_INFO_IF(gConfig.severity.info) << "diffCallInstance ... ...";
 
   int maxModule1FuncBBId = *info1.pBBCount;
 
