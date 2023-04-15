@@ -89,15 +89,16 @@ bool DataFlow::Analysis::test(Instruction *I, Function &F) {
   }
 
   std::string _t;
-      DbgValueInst *dbgVal = dyn_cast<DbgValueInst>(I);
-      if (dbgVal) {
-        DILocalVariable *var = dbgVal->getVariable();
-        if (var) {
-          std::string varName = var->getName().str();
-          llvm::raw_string_ostream(_t) << *I;
-          errs() << varName << " " << lineNum << " " << colNum << "\n";
-        }
-      }
+  llvm::raw_string_ostream(_t) << *I->getPrevNode();
+  DbgValueInst *dbgVal = dyn_cast<DbgValueInst>(I);
+  if (dbgVal) {
+    DILocalVariable *var = dbgVal->getVariable();
+    if (var) {
+      errs() << _t << "\n";
+      std::string varName = var->getName().str();
+      errs() << varName << " " << lineNum << " " << colNum << "\n";
+    }
+  }
 
   return false;
 }
@@ -128,7 +129,7 @@ bool DataFlow::Analysis::drawDataFlowGraph(Function &F) {
                              node(curII, getValueName(curII))));
         break;
       }
-      case llvm::Instruction::Store: {
+      case llvm::Instruction::Store: {        
         StoreInst *sinst = dyn_cast<StoreInst>(curII);
         Value *storeValPtr = sinst->getPointerOperand();
         Value *storeVal = sinst->getValueOperand();
@@ -139,12 +140,14 @@ bool DataFlow::Analysis::drawDataFlowGraph(Function &F) {
         break;
       }
       default: {
-        test(curII,F);
         for (Instruction::op_iterator op = curII->op_begin(),
                                       opEnd = curII->op_end();
              op != opEnd; ++op) {
           Instruction *tempIns;
           if (dyn_cast<Instruction>(*op)) {
+            Instruction *nextII = curII->getNextNode();
+            if (nextII)
+              test(nextII, F);
             edges.push_back(edge(node(op->get(), getValueName(op->get())),
                                  node(curII, getValueName(curII))));
           }
