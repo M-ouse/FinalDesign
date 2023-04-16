@@ -17,6 +17,7 @@
 #include <llvm/Support/raw_ostream.h>
 #include <queue>
 #include <regex>
+#include <string>
 
 namespace llvm {
 
@@ -80,6 +81,27 @@ std::string DataFlow::Analysis::EscapeString(const std::string &Label) {
 
 bool DataFlow::Analysis::test(Instruction *I, Function &F) {
 
+  DbgValueInst *dbgVal = dyn_cast<DbgValueInst>(I);
+  if (!dbgVal)
+    return false;
+  errs() << "curII: " << I << " *curII: " << *I << "\n";
+
+  DILocalVariable *var = dbgVal->getVariable();
+  std::string realname = var->getName().str();
+
+  unsigned lineNum = 0;
+  unsigned colNum = 0;
+
+  Value *V = dbgVal->getValue();
+
+  // errs() << "*V" << *V << "\n";
+
+  if (V->hasName()) {
+    varMap[V] = V->getName().str();
+    errs() << "[V: " << V << " V->getName(): " << V->getName() << " realname: "
+           << realname << "]\n";
+  }
+  /*
   unsigned lineNum = 0;
   unsigned colNum = 0;
   const DebugLoc &location = I->getDebugLoc();
@@ -101,6 +123,7 @@ bool DataFlow::Analysis::test(Instruction *I, Function &F) {
   }
 
   return false;
+  */
 }
 
 bool DataFlow::Analysis::drawDataFlowGraph(Function &F) {
@@ -120,6 +143,8 @@ bool DataFlow::Analysis::drawDataFlowGraph(Function &F) {
          II != IEnd; ++II) {
       Instruction *curII = &*II;
 
+      test(curII, F);
+
       switch (curII->getOpcode()) {
       // 由于load和store对内存进行操作，需要对load指令和stroe指令单独进行处理
       case llvm::Instruction::Load: {
@@ -129,7 +154,7 @@ bool DataFlow::Analysis::drawDataFlowGraph(Function &F) {
                              node(curII, getValueName(curII))));
         break;
       }
-      case llvm::Instruction::Store: {        
+      case llvm::Instruction::Store: {
         StoreInst *sinst = dyn_cast<StoreInst>(curII);
         Value *storeValPtr = sinst->getPointerOperand();
         Value *storeVal = sinst->getValueOperand();
@@ -143,15 +168,28 @@ bool DataFlow::Analysis::drawDataFlowGraph(Function &F) {
         for (Instruction::op_iterator op = curII->op_begin(),
                                       opEnd = curII->op_end();
              op != opEnd; ++op) {
-          Instruction *tempIns;
+
           if (dyn_cast<Instruction>(*op)) {
-            Instruction *nextII = curII->getNextNode();
-            if (nextII)
-              test(nextII, F);
+            /*
+            errs() << "*op->get(): " << *op->get() << " -> "
+                   << "*curII: " << *curII << "\n";
+            errs() << "op->get(): " << op->get() << " ->"
+                   << "curII: " << curII << "\n";
+            */
             edges.push_back(edge(node(op->get(), getValueName(op->get())),
                                  node(curII, getValueName(curII))));
+          } else {
+            /*
+            errs() << "*op->get(): " << *op->get() << " -> "
+                   << "*curII: " << *curII << "\n";
+            errs() << "op->get(): " << op->get() << " ->"
+                   << "curII: " << curII << "\n";
+            */
           }
         }
+        // errs() <<
+        // "------------------------------------------------------------"
+        //           "-----------\n";
         break;
       }
       }
@@ -180,15 +218,26 @@ bool DataFlow::Analysis::drawDataFlowGraph(Function &F) {
        node != node_end; ++node) {
     // errs() << "Node First:" << node->first << "\n";
     // errs() << "Node Second:" << node-> second << "\n";
+
+    // add line:col information to each node
+    llvm::Instruction *tmpI = dyn_cast<Instruction>(node->first);
+    unsigned lineNum = 0;
+    unsigned colNum = 0;
+    const DebugLoc &location = tmpI->getDebugLoc();
+    if (location) {
+      lineNum = location.getLine();
+      colNum = location.getCol();
+    }
+
     std::string instruction;
     if (dyn_cast<Instruction>(node->first)) {
       llvm::raw_string_ostream(instruction) << *(node->first);
-      file << "\tNode" << node->first << "[shape=record, label=\""
-           << EscapeString(instruction) << "\"];\n";
-    } else {
+      file << "\tNode" << node->first << "[shape=record, label=\"" << lineNum
+           << ":" << colNum << " " << EscapeString(instruction) << "\"];\n";
+    } else { // 如果不是指令，那么就是常量
       llvm::raw_string_ostream(instruction) << node->second;
-      file << "\tNode" << node->first << "[shape=record, label=\""
-           << instruction << "\"];\n";
+      file << "\tNode" << node->first << "[shape=record, label=\"" << lineNum
+           << ":" << colNum << " " << EscapeString(instruction) << "\"];\n";
     }
   }
 

@@ -47,6 +47,7 @@ public:
     edge_list edges;      // 存储data flow的边
     node_list nodes;      // 存储每条指令
     int num = 0;
+    std::map<llvm::Value*, std::string> varMap;
     StringRef getValueName(Value *v);
     std::string changeIns2Str(Instruction *ins);
     std::string EscapeString(const std::string &Label);

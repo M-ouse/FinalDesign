@@ -1,3 +1,3 @@
 digraph "CFG for'main' function" {
-	BB0 [shape=record, label="{BB0:\l31:18   %call = tail call i32 @usep(), !dbg !39, !range !40\l 31:3   %call1 = tail call i32 (ptr, ...) @printf(ptr noundef nonnull @.str.3, i32 noundef %call), !dbg !41\l 33:3   tail call void @test(ptr poison, i32 noundef 15), !dbg !42\l 34:3   ret i32 0, !dbg !43\l }"];
+	BB0 [shape=record, label="{BB0:\l33:18   %call = tail call i32 @usep(), !dbg !39, !range !40\l 33:3   %call1 = tail call i32 (ptr, ...) @printf(ptr noundef nonnull @.str.3, i32 noundef %call), !dbg !41\l 35:3   tail call void @test(ptr poison, i32 noundef 15), !dbg !42\l 36:3   ret i32 0, !dbg !43\l }"];
 }
