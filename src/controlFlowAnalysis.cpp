@@ -448,6 +448,7 @@ void controlFlowInconsistencyAnalysis::diffCallInstanceInBB(
   // debug output end
 
   // compare call instruction
+  // TODO: compare zero call, the define is not in this compare class, is in generate class
 
   for (int bb = 0; bb < maxModule1FuncBBId; bb++) {
     if (info1.pCallInfo->find(bb) != info1.pCallInfo->end() &&
