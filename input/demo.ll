@@ -132,7 +132,7 @@ attributes #10 = { nounwind allocsize(0,1) }
 
 !0 = !DIGlobalVariableExpression(var: !1, expr: !DIExpression())
 !1 = distinct !DIGlobalVariable(scope: null, file: !2, line: 6, type: !3, isLocal: true, isDefinition: true)
-!2 = !DIFile(filename: "demo.c", directory: "/home/secondst/code/MyAnalysis/demo", checksumkind: CSK_MD5, checksum: "26adf4b179d2a21123292fc1498568fc")
+!2 = !DIFile(filename: "demo.c", directory: "/home/secondst/code/MyAnalysis/demo", checksumkind: CSK_MD5, checksum: "dc638e2e20c25568541fc432b519fcdc")
 !3 = !DICompositeType(tag: DW_TAG_array_type, baseType: !4, size: 24, elements: !5)
 !4 = !DIBasicType(name: "char", size: 8, encoding: DW_ATE_signed_char)
 !5 = !{!6}

@@ -171,6 +171,6 @@ int main(int argc, const char *argv[]) {
     doControlFlowAnalysis(FAM, M1, M2);
   if (gConfig.AnalysisDFG)
     doDataFlowAnalysis(FAM, M1, M2);
-
+  // getchar(); for mem test
   return 0;
 }

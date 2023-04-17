@@ -59,16 +59,15 @@ public:
     std::error_code error;
     std::string str;
     int bbCount;                       // total bb count
-    std::map<BasicBlock *, int> BB2Id; // block - id
-    std::map<int, BasicBlock *> id2BB; // id - block
+    std::map<BasicBlock *, int> *BB2Id; // block - id
+    std::map<int, BasicBlock *> *id2BB; // id - block
     int bbMap[maxBBCount][maxBBCount];
-    std::map<int, std::vector<llvm::StringRef>> callInfo;
-    std::map<int, std::vector<void *>> callInfo2;
-    std::map<void *, int> instance2line; // ir instance - source line
+    std::map<int, std::vector<llvm::StringRef>> *callInfo;
+    std::map<int, std::vector<void *>> *callInfo2;
+    std::map<void *, int> *instance2line; // ir instance - source line
 
     // public:
-    Analysis() = default;
-    ~Analysis() = default;
+    Analysis();
     bool draw(Function &F);
     bool FuncAnalysis(Function &F);
     bool dumpCalls();
@@ -82,9 +81,10 @@ public:
 };
 
 class controlFlowInconsistencyAnalysis {
-  std::map<int, std::pair<int, float>> matchMap;
+  std::map<int, std::pair<int, float>> *matchMap;
 
 public:
+  controlFlowInconsistencyAnalysis();
   void Wrapper(std::vector<AnalyzedControlFlowInfo> *,
                                     std::vector<AnalyzedControlFlowInfo> *,
                                     StringRef);
@@ -92,7 +92,6 @@ public:
   float seqLCS(std::string, std::string);
   void dumpMatchMap();
   void diffCallInstanceInBB(AnalyzedControlFlowInfo, AnalyzedControlFlowInfo);
-  controlFlowInconsistencyAnalysis() = default;
 };
 
 } // namespace llvm
