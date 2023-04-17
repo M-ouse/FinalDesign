@@ -87,10 +87,10 @@ bool ControlFlow::Analysis::FuncAnalysis(Function &F) {
         llvm::CallInst *callInst = dyn_cast<llvm::CallInst>(I);
         llvm::Function *calledFunc = callInst->getCalledFunction();
 
-        if (calledFunc == nullptr)
+        if (calledFunc == nullptr) 
           break;
 
-        if (!calledFunc->hasName())
+        if (!calledFunc->hasName()) // in case of null def
           break;
 
         // errs() << "In block: " << i_BB << " call " << calledFunc->getName()
@@ -469,7 +469,7 @@ void controlFlowInconsistencyAnalysis::diffCallInstanceInBB(
 
             std::map<void *, int> *_t = info.pInstance2line;
             unsigned int line = (*_t)[inst];
-
+            // do not need getName check because the list is "named" list, already filtered
             PLOG_FATAL_IF(gConfig.severity.fatal)
                 << "Module: " << module << " "
                 << "BB: " << bb << " "
@@ -506,6 +506,7 @@ void controlFlowInconsistencyAnalysis::diffCallInstanceInBB(
             llvm::CallInst *callInst2 = dyn_cast<llvm::CallInst>(inst2);
             llvm::Function *calledFunc1 = callInst1->getCalledFunction();
             llvm::Function *calledFunc2 = callInst2->getCalledFunction();
+            // do not need getName check because the list is "named" list, already filtered
             if (calledFunc1->getName() == calledFunc2->getName()) {
               dp[i][j] = dp[i - 1][j - 1] + 1;
               endIndex1 = i - 1;

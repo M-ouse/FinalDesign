@@ -4,8 +4,8 @@
     "targetFunction": "slc_free_netdev",
     "AnalysisCFG" : true,
     "drawCFG": false,
-    "AnalysisDFG" : false,
-    "drawDFG": false,
+    "AnalysisDFG" : true,
+    "drawDFG": true,
     "Severity": {
         "none": false,
         "fatal": true,
