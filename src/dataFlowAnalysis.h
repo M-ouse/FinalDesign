@@ -47,12 +47,13 @@ public:
     edge_list edges;      // 存储data flow的边
     node_list nodes;      // 存储每条指令
     int num = 0;
-    std::map<llvm::Value*, std::string> varMap;
+    std::map<llvm::Value*, std::string> varMap; // Value* -> realname
     StringRef getValueName(Value *v);
     std::string changeIns2Str(Instruction *ins);
     std::string EscapeString(const std::string &Label);
     bool drawDataFlowGraph(Function &F);
     bool test(Instruction *I, Function &F);
+    std::string op2realname(llvm::Value*,llvm::Instruction*);
   };
 
 public:

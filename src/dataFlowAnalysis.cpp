@@ -84,7 +84,7 @@ bool DataFlow::Analysis::test(Instruction *I, Function &F) {
   DbgValueInst *dbgVal = dyn_cast<DbgValueInst>(I);
   if (!dbgVal)
     return false;
-  errs() << "curII: " << I << " *curII: " << *I << "\n";
+  // errs() << "curII: " << I << " *curII: " << *I << "\n";
 
   DILocalVariable *var = dbgVal->getVariable();
   std::string realname = var->getName().str();
@@ -94,36 +94,32 @@ bool DataFlow::Analysis::test(Instruction *I, Function &F) {
 
   Value *V = dbgVal->getValue();
 
-  // errs() << "*V" << *V << "\n";
-
   if (V->hasName()) {
-    varMap[V] = V->getName().str();
-    errs() << "[V: " << V << " V->getName(): " << V->getName() << " realname: "
-           << realname << "]\n";
+    // varMap[V] = V->getName().str(); // this is alias name
+    varMap[V] = realname; // this is real name
+    // errs() << "[V: " << V << " V->getName(): " << V->getName() << " realname:
+    // "
+    //        << realname << "]\n";
   }
-  /*
-  unsigned lineNum = 0;
-  unsigned colNum = 0;
-  const DebugLoc &location = I->getDebugLoc();
-  if (location) {
-    lineNum = location.getLine();
-    colNum = location.getCol();
-  }
+}
 
-  std::string _t;
-  llvm::raw_string_ostream(_t) << *I->getPrevNode();
-  DbgValueInst *dbgVal = dyn_cast<DbgValueInst>(I);
-  if (dbgVal) {
-    DILocalVariable *var = dbgVal->getVariable();
-    if (var) {
-      errs() << _t << "\n";
-      std::string varName = var->getName().str();
-      errs() << varName << " " << lineNum << " " << colNum << "\n";
+std::string DataFlow::Analysis::op2realname(llvm::Value *V,
+                                            llvm::Instruction *curII) {
+
+  if (varMap.find(V) != varMap.end()) {
+    unsigned lineNum = 0;
+    unsigned colNum = 0;
+    const DebugLoc &location = curII->getDebugLoc();
+    if (location) {
+      lineNum = location.getLine();
+      colNum = location.getCol();
     }
+    PLOG_DEBUG_IF(gConfig.severity.debug)
+        << "line: " << lineNum << " col: " << colNum << ", op's realname is "
+        << varMap[V];
+    return varMap[V];
   }
-
-  return false;
-  */
+  return "";
 }
 
 bool DataFlow::Analysis::drawDataFlowGraph(Function &F) {
@@ -150,11 +146,13 @@ bool DataFlow::Analysis::drawDataFlowGraph(Function &F) {
       case llvm::Instruction::Load: {
         LoadInst *linst = dyn_cast<LoadInst>(curII);
         Value *loadValPtr = linst->getPointerOperand();
+        op2realname(loadValPtr, curII); // for test func
         edges.push_back(edge(node(loadValPtr, getValueName(loadValPtr)),
                              node(curII, getValueName(curII))));
         break;
       }
       case llvm::Instruction::Store: {
+        // errs() << "Store-> " << *curII << "\n";
         StoreInst *sinst = dyn_cast<StoreInst>(curII);
         Value *storeValPtr = sinst->getPointerOperand();
         Value *storeVal = sinst->getValueOperand();
@@ -170,26 +168,13 @@ bool DataFlow::Analysis::drawDataFlowGraph(Function &F) {
              op != opEnd; ++op) {
 
           if (dyn_cast<Instruction>(*op)) {
-            /*
-            errs() << "*op->get(): " << *op->get() << " -> "
-                   << "*curII: " << *curII << "\n";
-            errs() << "op->get(): " << op->get() << " ->"
-                   << "curII: " << curII << "\n";
-            */
+            op2realname(*op, curII); // for test func
             edges.push_back(edge(node(op->get(), getValueName(op->get())),
                                  node(curII, getValueName(curII))));
           } else {
-            /*
-            errs() << "*op->get(): " << *op->get() << " -> "
-                   << "*curII: " << *curII << "\n";
-            errs() << "op->get(): " << op->get() << " ->"
-                   << "curII: " << curII << "\n";
-            */
+            // constant
           }
         }
-        // errs() <<
-        // "------------------------------------------------------------"
-        //           "-----------\n";
         break;
       }
       }
