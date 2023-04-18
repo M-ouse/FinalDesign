@@ -6,4 +6,5 @@ cmake_install.cmake
 Makefile
 demo
 stool
+result
 output/

@@ -1,8 +1,8 @@
 {
     "IRFile1": "./input/slcan-lts.bc",
-    "IRFile2": "./input/slcan-ups.bc",
+    "IRFile2": "./input/slcan-ups.ll",
     "targetFunction": "slc_free_netdev",
-    "AnalysisCFG" : true,
+    "AnalysisCFG" : false,
     "drawCFG": false,
     "AnalysisDFG" : true,
     "drawDFG": true,

@@ -54,6 +54,7 @@ public:
     bool drawDataFlowGraph(Function &F);
     bool test(Instruction *I, Function &F);
     std::string op2realname(llvm::Value*,llvm::Instruction*);
+    bool initVarMap(Function &F);
   };
 
 public:

@@ -101,6 +101,33 @@ bool DataFlow::Analysis::test(Instruction *I, Function &F) {
     // "
     //        << realname << "]\n";
   }
+  return false;
+}
+
+bool DataFlow::Analysis::initVarMap(Function &F) {
+  for (Function::iterator BB = F.begin(), BEnd = F.end(); BB != BEnd; ++BB) {
+    BasicBlock *curBB = &*BB;
+    for (BasicBlock::iterator II = curBB->begin(), IEnd = curBB->end();
+         II != IEnd; ++II) {
+      Instruction *curII = &*II;
+      DbgValueInst *dbgVal = dyn_cast<DbgValueInst>(curII);
+      if (!dbgVal)
+        continue;
+      Value *V = dbgVal->getValue();
+      DILocalVariable *var = dbgVal->getVariable();
+      std::string realname = var->getName().str();
+      unsigned lineNum = 0;
+      unsigned colNum = 0;
+      // errs() << *curII << "\n";
+      varMap[V] = realname;
+      PLOG_DEBUG_IF(gConfig.severity.debug) << "stored: " << realname;
+      if (V->hasName()) {
+        // varMap[V] = realname;
+        // PLOG_DEBUG_IF(gConfig.severity.debug) << "stored: " << realname;
+      }
+    }
+  }
+  return true;
 }
 
 std::string DataFlow::Analysis::op2realname(llvm::Value *V,
@@ -139,8 +166,6 @@ bool DataFlow::Analysis::drawDataFlowGraph(Function &F) {
          II != IEnd; ++II) {
       Instruction *curII = &*II;
 
-      test(curII, F);
-
       switch (curII->getOpcode()) {
       // 由于load和store对内存进行操作，需要对load指令和stroe指令单独进行处理
       case llvm::Instruction::Load: {
@@ -155,7 +180,9 @@ bool DataFlow::Analysis::drawDataFlowGraph(Function &F) {
         // errs() << "Store-> " << *curII << "\n";
         StoreInst *sinst = dyn_cast<StoreInst>(curII);
         Value *storeValPtr = sinst->getPointerOperand();
+        op2realname(storeValPtr, curII);
         Value *storeVal = sinst->getValueOperand();
+        op2realname(storeVal, curII);
         edges.push_back(edge(node(storeVal, getValueName(storeVal)),
                              node(curII, getValueName(curII))));
         edges.push_back(edge(node(curII, getValueName(curII)),
@@ -256,6 +283,7 @@ DataFlow::Result DataFlow::run(Function &F, FunctionAnalysisManager &AM) {
 
   Analysis *A = new Analysis();
 
+  A->initVarMap(F);
   if (gConfig.drawDFG)
     A->drawDataFlowGraph(F);
 
