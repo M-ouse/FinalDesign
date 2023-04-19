@@ -1,11 +1,14 @@
 #include "controlFlowAnalysis.h"
 #include "common.h"
 #include "third_party/plog/Log.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Value.h"
 #include <iomanip>
 #include <llvm-15/llvm/IR/BasicBlock.h>
 #include <llvm-15/llvm/IR/Function.h>
 #include <llvm-15/llvm/IR/Instruction.h>
+#include <llvm-15/llvm/IR/Instructions.h>
+#include <llvm-15/llvm/Support/Casting.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Analysis/BasicAliasAnalysis.h>
 #include <llvm/Support/raw_ostream.h>
@@ -66,6 +69,7 @@ unsigned int ControlFlow::Analysis::getInstructionLine(llvm::Instruction *I) {
   return lineNum;
 }
 
+// TODO: ret val analysis
 bool ControlFlow::Analysis::FuncAnalysis(Function &F) {
 
   PLOG_DEBUG_IF(gConfig.severity.debug)
@@ -73,6 +77,7 @@ bool ControlFlow::Analysis::FuncAnalysis(Function &F) {
 
   for (int i_BB = 0; i_BB < bbCount; i_BB++) {
     BasicBlock *curBB = id2BB->at(i_BB); // id2BB[i_BB];
+    bool hasCall = false;
     for (BasicBlock::iterator I_iter = curBB->begin(); I_iter != curBB->end();
          ++I_iter) { // dump instructions in the basic block
       llvm::Instruction *I = dyn_cast<llvm::Instruction>(I_iter);
@@ -87,7 +92,7 @@ bool ControlFlow::Analysis::FuncAnalysis(Function &F) {
         llvm::CallInst *callInst = dyn_cast<llvm::CallInst>(I);
         llvm::Function *calledFunc = callInst->getCalledFunction();
 
-        if (calledFunc == nullptr) 
+        if (calledFunc == nullptr)
           break;
 
         if (!calledFunc->hasName()) // in case of null def
@@ -104,15 +109,17 @@ bool ControlFlow::Analysis::FuncAnalysis(Function &F) {
 
           (*callInfo2)[i_BB].push_back(I); // test now
         } else {
-          std::vector<llvm::StringRef> funcName;
-          funcName.push_back(calledFunc->getName());
-          (*callInfo)[i_BB] = funcName;
+          std::vector<llvm::StringRef> *funcName =
+              new std::vector<llvm::StringRef>();
+          funcName->push_back(calledFunc->getName());
+          (*callInfo)[i_BB] = *funcName;
 
-          std::vector<void *> callInstVec;  // test now
-          callInstVec.push_back(I);         // test now
-          (*callInfo2)[i_BB] = callInstVec; // test now
+          std::vector<void *> *callInstVec = new std::vector<void *>();
+          callInstVec->push_back(I);         // test now
+          (*callInfo2)[i_BB] = *callInstVec; // test now
         }
-
+        hasCall = true; // not so rigorous, I don't know if there will be "no
+                        // name" function call
         break;
       }
       case llvm::Instruction::Ret: // detect return instruction
@@ -129,7 +136,11 @@ bool ControlFlow::Analysis::FuncAnalysis(Function &F) {
       }
       }
     }
+    if (!hasCall) {
+      // TODO: null call
+    }
   }
+
   return true;
 }
 
@@ -309,6 +320,7 @@ void controlFlowInconsistencyAnalysis::match(AnalyzedControlFlowInfo info1,
       new std::map<int, std::pair<int, float>>;
 
   PLOG_DEBUG_IF(gConfig.severity.debug)
+      << "\n"
       << info1.pF->getName() << " "
       << "blocks count: " << *info1.pBBCount << "\n"
       << info2.pF->getName() << " "
@@ -406,6 +418,14 @@ void controlFlowInconsistencyAnalysis::diffCallInstanceInBB(
 
   int maxModule1FuncBBId = *info1.pBBCount;
 
+  auto dumpLine = [](std::vector<void *> instList, AnalyzedControlFlowInfo info,
+                     int index) {
+    llvm::Instruction *inst = (llvm::Instruction *)instList[index];
+    std::map<void *, int> *_t = info.pInstance2line;
+    unsigned int line = (*_t)[inst];
+    return line;
+  };
+
   // only for debug output
 
   for (int bb = 0; bb < maxModule1FuncBBId; bb++) {
@@ -447,8 +467,38 @@ void controlFlowInconsistencyAnalysis::diffCallInstanceInBB(
 
   // debug output end
 
+  for (int bb = 0; bb < maxModule1FuncBBId; bb++) {
+    if (matchMap->find(bb) != matchMap->end()) {
+      // so far ensure a match status
+      int matchBB = matchMap->at(bb).first;
+
+      if (info1.pCallInfo2->find(bb) == info1.pCallInfo2->end() &&
+          info2.pCallInfo2->find(matchBB) != info2.pCallInfo2->end()) {
+        std::vector<void *> instList = info2.pCallInfo2->at(matchBB);
+        int len = instList.size();
+        for (int i = 0; i < len; i++) {
+          PLOG_FATAL_IF(gConfig.severity.fatal)
+              << "M1 no call, Inconsistent occurs in M2 at line: "
+              << dumpLine(instList, info2, i);
+        }
+      }
+
+      if (info1.pCallInfo2->find(bb) != info1.pCallInfo2->end() &&
+          info2.pCallInfo2->find(matchBB) == info2.pCallInfo2->end()) {
+        std::vector<void *> instList = info1.pCallInfo2->at(bb);
+        int len = instList.size();
+        for (int i = 0; i < len; i++) {
+          PLOG_FATAL_IF(gConfig.severity.fatal)
+              << "M2 no call, Inconsistent occurs in M1 at line: "
+              << dumpLine(instList, info1, i);
+        }
+      }
+    }
+  }
+
   // compare call instruction
-  // TODO: compare zero call, the define is not in this compare class, is in generate class
+  // TODO: compare zero call, the define is not in this compare class, is in
+  // generate class
 
   for (int bb = 0; bb < maxModule1FuncBBId; bb++) {
     if (info1.pCallInfo->find(bb) != info1.pCallInfo->end() &&
@@ -469,7 +519,8 @@ void controlFlowInconsistencyAnalysis::diffCallInstanceInBB(
 
             std::map<void *, int> *_t = info.pInstance2line;
             unsigned int line = (*_t)[inst];
-            // do not need getName check because the list is "named" list, already filtered
+            // do not need getName check because the list is "named" list,
+            // already filtered
             PLOG_FATAL_IF(gConfig.severity.fatal)
                 << "Module: " << module << " "
                 << "BB: " << bb << " "
@@ -480,17 +531,6 @@ void controlFlowInconsistencyAnalysis::diffCallInstanceInBB(
 
         std::vector<void *> instList1 = info1.pCallInfo2->at(bb);
         std::vector<void *> instList2 = info2.pCallInfo2->at(matchBB);
-        // printLine(instList1, info1, "M1", bb);
-        // printLine(instList2, info2, "M2", matchBB);
-        /*test for inst to line END*/
-
-        auto dumpLine = [](std::vector<void *> instList,
-                           AnalyzedControlFlowInfo info, int index) {
-          llvm::Instruction *inst = (llvm::Instruction *)instList[index];
-          std::map<void *, int> *_t = info.pInstance2line;
-          unsigned int line = (*_t)[inst];
-          return line;
-        };
 
         int len1 = instList1.size(), len2 = instList2.size();
         int endIndex1 = 0, startIndex1 = 0;
@@ -506,7 +546,8 @@ void controlFlowInconsistencyAnalysis::diffCallInstanceInBB(
             llvm::CallInst *callInst2 = dyn_cast<llvm::CallInst>(inst2);
             llvm::Function *calledFunc1 = callInst1->getCalledFunction();
             llvm::Function *calledFunc2 = callInst2->getCalledFunction();
-            // do not need getName check because the list is "named" list, already filtered
+            // do not need getName check because the list is "named" list,
+            // already filtered
             if (calledFunc1->getName() == calledFunc2->getName()) {
               dp[i][j] = dp[i - 1][j - 1] + 1;
               endIndex1 = i - 1;
@@ -562,34 +603,6 @@ void controlFlowInconsistencyAnalysis::diffCallInstanceInBB(
               << ", endIndex1:" << endIndex1 << ", startIndex2:" << startIndex2
               << ", endIndex2:" << endIndex2;
         }
-
-        /*
-        auto callListToSeq = [](std::vector<llvm::StringRef> callList) {
-          std::string seq;
-          for (auto iter = callList.begin(); iter != callList.end(); iter++) {
-            seq += *iter;
-          }
-          return seq;
-        };
-
-        std::string callSeq1 = callListToSeq(callList1);
-        std::string callSeq2 = callListToSeq(callList2);
-        float ratio = seqLCS(callSeq1, callSeq2);
-        // if (gConfig.verbose) {
-        PLOG_DEBUG_IF(gConfig.severity.debug)
-            << "BB" << bb << " "
-            << "callSeq1: " << callSeq1 << "\n"
-            << "BB" << matchBB << " "
-            << "callSeq2: " << callSeq2 << "\n"
-            << "match ratio: " << ratio << "\n"
-            << "\n";
-        if (ratio != 1.0) {
-          // BasicBlock *pBB = info2.pId2BB->at(matchBB);
-          // errs() << "inconsistency occurs at " << pBB->getDebugLoc() <<
-          // "\n";
-        }
-        */
-        // }
       }
     }
   }

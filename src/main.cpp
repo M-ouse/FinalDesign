@@ -101,6 +101,8 @@ bool doDataFlowAnalysis(FunctionAnalysisManager &FAM,
         gCurrentModule = M->getName().str();
         for (Function &F : *M) {
           if (!F.isDeclaration()) {
+            if (gConfig.targetFunction != F.getName().str()) // for single test
+              continue;
             PLOG_DEBUG_IF(gConfig.severity.debug)
                 << "Run FAM in " << F.getName();
             AnalyzedDataFlowInfo res = FAM.getResult<DataFlow>(F);

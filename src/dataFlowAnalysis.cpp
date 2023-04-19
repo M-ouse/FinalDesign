@@ -80,27 +80,33 @@ std::string DataFlow::Analysis::EscapeString(const std::string &Label) {
 }
 
 bool DataFlow::Analysis::test(Instruction *I, Function &F) {
-
-  DbgValueInst *dbgVal = dyn_cast<DbgValueInst>(I);
-  if (!dbgVal)
-    return false;
-  // errs() << "curII: " << I << " *curII: " << *I << "\n";
-
-  DILocalVariable *var = dbgVal->getVariable();
-  std::string realname = var->getName().str();
-
-  unsigned lineNum = 0;
-  unsigned colNum = 0;
-
-  Value *V = dbgVal->getValue();
-
-  if (V->hasName()) {
-    // varMap[V] = V->getName().str(); // this is alias name
-    varMap[V] = realname; // this is real name
-    // errs() << "[V: " << V << " V->getName(): " << V->getName() << " realname:
-    // "
-    //        << realname << "]\n";
+  errs() << "----------------------test START--------------------\n";
+  errs() << "Raw I: " << *I << "\n";
+  unsigned int n =  I->getNumOperands();
+  errs() << "I->getNumOperands(): " << n << "\n";
+  for (Instruction::op_iterator op = I->op_begin(), opEnd = I->op_end();
+       op != opEnd; ++op) {
+      llvm::Type* type = op->get()->getType();
+      errs() << "op: " << *op->get() << " type: "<< type->getTypeID() << "\n";
+      Value *V = op->get();
+      if (V) {
+        if(V->hasName()){
+          errs() << "V->getName(): " << V->getName() << "\n";
+        }
+      }
+    /*
+    if (dyn_cast<Instruction>(*op)) {
+      Value *V = dyn_cast<Value>(*op);
+      if(V){
+        if(V->hasName()){
+          errs() << V->getName() << "\n";
+        }
+      }
+    }
+    */
   }
+  
+  errs() << "----------------------test END----------------------\n";
   return false;
 }
 
@@ -116,15 +122,14 @@ bool DataFlow::Analysis::initVarMap(Function &F) {
       Value *V = dbgVal->getValue();
       DILocalVariable *var = dbgVal->getVariable();
       std::string realname = var->getName().str();
-      unsigned lineNum = 0;
-      unsigned colNum = 0;
       // errs() << *curII << "\n";
       varMap[V] = realname;
-      PLOG_DEBUG_IF(gConfig.severity.debug) << "stored: " << realname;
-      if (V->hasName()) {
-        // varMap[V] = realname;
-        // PLOG_DEBUG_IF(gConfig.severity.debug) << "stored: " << realname;
-      }
+      PLOG_DEBUG_IF(gConfig.severity.debug) << V << ": stored: " << realname;
+      
+      // get metadata
+
+
+
     }
   }
   return true;
@@ -165,7 +170,7 @@ bool DataFlow::Analysis::drawDataFlowGraph(Function &F) {
     for (BasicBlock::iterator II = curBB->begin(), IEnd = curBB->end();
          II != IEnd; ++II) {
       Instruction *curII = &*II;
-
+      test(curII, F);
       switch (curII->getOpcode()) {
       // 由于load和store对内存进行操作，需要对load指令和stroe指令单独进行处理
       case llvm::Instruction::Load: {
