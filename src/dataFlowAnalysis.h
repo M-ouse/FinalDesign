@@ -21,9 +21,17 @@
 #include <map>
 
 namespace llvm {
+
+#define maxInsCount 5000
 class AnalyzedDataFlowInfo {
 public:
   AnalyzedDataFlowInfo(Function &F);
+  std::map<int, Instruction *> *pId2Ins; // id - ins
+  std::map<Instruction *, int> *pIns2Id; // ins - id
+  int (*pInsMap)[maxInsCount];
+  std::map<llvm::Value *, std::string> *pVarMap;
+
+  Function *pF;
   bool valid = false;
 };
 class DataFlow : public AnalysisInfoMixin<DataFlow> {
@@ -47,14 +55,21 @@ public:
     edge_list edges;      // 存储data flow的边
     node_list nodes;      // 存储每条指令
     int num = 0;
-    std::map<llvm::Value*, std::string> varMap; // Value* -> realname
+    std::map<llvm::Value *, std::string> *varMap; // Value* -> realname
+
+    int (*pInsMap)[maxInsCount];
+    std::map<int, llvm::Instruction *> *pId2Ins; // id - ins
+    std::map<llvm::Instruction *, int> *pIns2Id; // ins - id
+
+    Analysis();
     StringRef getValueName(Value *v);
     std::string changeIns2Str(Instruction *ins);
     std::string EscapeString(const std::string &Label);
     bool drawDataFlowGraph(Function &F);
     bool test(Instruction *I, Function &F);
-    std::string op2realname(llvm::Value*,llvm::Instruction*);
+    std::string op2realname(llvm::Value *, llvm::Instruction *);
     bool initVarMap(Function &F);
+    bool buildDFG(Function &F);
   };
 
 public:
@@ -62,6 +77,11 @@ public:
   Result run(Function &F, FunctionAnalysisManager &AM);
 };
 
-class dataFlowInconsistencyAnalysis {};
-
+class dataFlowInconsistencyAnalysis {
+public:
+  dataFlowInconsistencyAnalysis();
+  void Wrapper(std::vector<AnalyzedDataFlowInfo> *,
+               std::vector<AnalyzedDataFlowInfo> *, StringRef);
+  void match(AnalyzedDataFlowInfo, AnalyzedDataFlowInfo);
+};
 } // namespace llvm

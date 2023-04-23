@@ -2,6 +2,7 @@
 #include "common.h"
 #include "third_party/plog/Log.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
 #include <iomanip>
 #include <llvm-15/llvm/IR/BasicBlock.h>
@@ -138,6 +139,7 @@ bool ControlFlow::Analysis::FuncAnalysis(Function &F) {
     }
     if (!hasCall) {
       // TODO: null call
+      // auto *ai = new AllocaInst(Type::getin);
     }
   }
 
@@ -439,7 +441,6 @@ void controlFlowInconsistencyAnalysis::diffCallInstanceInBB(
       for (auto iter = info1.pCallInfo->at(bb).begin();
            iter != info1.pCallInfo->at(bb).end(); iter++)
         PLOG_DEBUG_IF(gConfig.severity.debug) << *iter << " ";
-      PLOG_DEBUG_IF(gConfig.severity.debug) << "\n";
     }
 
     if (matchMap->find(bb) == matchMap->end()) {
@@ -460,7 +461,6 @@ void controlFlowInconsistencyAnalysis::diffCallInstanceInBB(
         for (auto iter = info2.pCallInfo->at(matchBB).begin();
              iter != info2.pCallInfo->at(matchBB).end(); iter++)
           PLOG_DEBUG_IF(gConfig.severity.debug) << *iter << " ";
-        PLOG_DEBUG_IF(gConfig.severity.debug) << "\n";
       }
     }
   }
@@ -471,6 +471,7 @@ void controlFlowInconsistencyAnalysis::diffCallInstanceInBB(
     if (matchMap->find(bb) != matchMap->end()) {
       // so far ensure a match status
       int matchBB = matchMap->at(bb).first;
+      double ratio = matchMap->at(bb).second;
 
       if (info1.pCallInfo2->find(bb) == info1.pCallInfo2->end() &&
           info2.pCallInfo2->find(matchBB) != info2.pCallInfo2->end()) {
@@ -479,7 +480,8 @@ void controlFlowInconsistencyAnalysis::diffCallInstanceInBB(
         for (int i = 0; i < len; i++) {
           PLOG_FATAL_IF(gConfig.severity.fatal)
               << "M1 no call, Inconsistent occurs in M2 at line: "
-              << dumpLine(instList, info2, i);
+              << dumpLine(instList, info2, i) << " "
+              << "match ratio: " << ratio << "\n";
         }
       }
 
@@ -490,7 +492,8 @@ void controlFlowInconsistencyAnalysis::diffCallInstanceInBB(
         for (int i = 0; i < len; i++) {
           PLOG_FATAL_IF(gConfig.severity.fatal)
               << "M2 no call, Inconsistent occurs in M1 at line: "
-              << dumpLine(instList, info1, i);
+              << dumpLine(instList, info1, i) << " "
+              << "match ratio: " << ratio << "\n";
         }
       }
     }

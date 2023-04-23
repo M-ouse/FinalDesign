@@ -80,32 +80,26 @@ std::string DataFlow::Analysis::EscapeString(const std::string &Label) {
 }
 
 bool DataFlow::Analysis::test(Instruction *I, Function &F) {
+  return true;
   errs() << "----------------------test START--------------------\n";
-  errs() << "Raw I: " << *I << "\n";
-  unsigned int n =  I->getNumOperands();
-  errs() << "I->getNumOperands(): " << n << "\n";
+  errs() << *I << "\n";
   for (Instruction::op_iterator op = I->op_begin(), opEnd = I->op_end();
        op != opEnd; ++op) {
-      llvm::Type* type = op->get()->getType();
-      errs() << "op: " << *op->get() << " type: "<< type->getTypeID() << "\n";
-      Value *V = op->get();
-      if (V) {
-        if(V->hasName()){
-          errs() << "V->getName(): " << V->getName() << "\n";
-        }
-      }
-    /*
-    if (dyn_cast<Instruction>(*op)) {
-      Value *V = dyn_cast<Value>(*op);
-      if(V){
-        if(V->hasName()){
-          errs() << V->getName() << "\n";
-        }
+    Value *V = op->get();
+    if (V) {
+      if (varMap->find(V) != varMap->end()) {
+        PLOG_DEBUG_IF(gConfig.severity.debug) << "varMap[V]: " << varMap->at(V);
       }
     }
-    */
   }
-  
+  for (Use &U : I->operands()) {
+    Value *v = U.get();
+    if (v) {
+      if (varMap->find(v) != varMap->end()) {
+        PLOG_DEBUG_IF(gConfig.severity.debug) << "varMap[v]: " << varMap->at(v);
+      }
+    }
+  }
   errs() << "----------------------test END----------------------\n";
   return false;
 }
@@ -123,13 +117,11 @@ bool DataFlow::Analysis::initVarMap(Function &F) {
       DILocalVariable *var = dbgVal->getVariable();
       std::string realname = var->getName().str();
       // errs() << *curII << "\n";
-      varMap[V] = realname;
-      PLOG_DEBUG_IF(gConfig.severity.debug) << V << ": stored: " << realname;
-      
+      // *varMap[V] = realname;
+      varMap->insert(std::pair<llvm::Value *, std::string>(V, realname));
+      // PLOG_DEBUG_IF(gConfig.severity.debug) << V << ": stored: " << realname;
+
       // get metadata
-
-
-
     }
   }
   return true;
@@ -138,7 +130,7 @@ bool DataFlow::Analysis::initVarMap(Function &F) {
 std::string DataFlow::Analysis::op2realname(llvm::Value *V,
                                             llvm::Instruction *curII) {
 
-  if (varMap.find(V) != varMap.end()) {
+  if (varMap->find(V) != varMap->end()) {
     unsigned lineNum = 0;
     unsigned colNum = 0;
     const DebugLoc &location = curII->getDebugLoc();
@@ -148,10 +140,104 @@ std::string DataFlow::Analysis::op2realname(llvm::Value *V,
     }
     PLOG_DEBUG_IF(gConfig.severity.debug)
         << "line: " << lineNum << " col: " << colNum << ", op's realname is "
-        << varMap[V];
-    return varMap[V];
+        << varMap->at(V);
+    return varMap->at(V);
   }
   return "";
+}
+
+DataFlow::Analysis::Analysis() {
+  pInsMap = new int[maxInsCount][maxInsCount];
+  pId2Ins = new std::map<int, llvm::Instruction *>();
+  pIns2Id = new std::map<llvm::Instruction *, int>();
+  varMap = new std::map<llvm::Value *, std::string>();
+}
+
+bool DataFlow::Analysis::buildDFG(Function &F) {
+  PLOG_INFO_IF(gConfig.severity.info) << "buildDFG in " << F.getName();
+  std::error_code error;
+
+  // reuse
+  int id = 0;
+  edges.clear();
+  nodes.clear();
+  inst_edges.clear();
+
+  auto mapping = [this](Value *fromV, Value *toV) {
+    int from, to;
+    from = to = 0;
+    if (pIns2Id->find(dyn_cast<Instruction>(fromV)) != pIns2Id->end()) {
+      from = pIns2Id->at(dyn_cast<Instruction>(fromV));
+    }
+    if (pIns2Id->find(dyn_cast<Instruction>(toV)) != pIns2Id->end()) {
+      to = pIns2Id->at(dyn_cast<Instruction>(toV));
+    }
+    this->pInsMap[from][to] = 1;
+  };
+
+  for (Function::iterator BB = F.begin(), BEnd = F.end(); BB != BEnd; ++BB) {
+    BasicBlock *curBB = &*BB;
+    for (BasicBlock::iterator II = curBB->begin(), IEnd = curBB->end();
+         II != IEnd; ++II) {
+      Instruction *curII = &*II;
+
+      std::string instruction;
+      llvm::raw_string_ostream(instruction) << *curII;
+      if (instruction.find("llvm.dbg") != std::string::npos) {
+        continue;
+      }
+
+      // init mapping relation
+      if (pIns2Id->find(curII) == pIns2Id->end()) {
+        pIns2Id->insert(std::pair<llvm::Instruction *, int>(curII, id));
+        pId2Ins->insert(std::pair<int, llvm::Instruction *>(id, curII));
+        id++;
+      } else {
+        PLOG_FATAL_IF(gConfig.severity.fatal)
+            << "instruction already exist, WTF?";
+      }
+      // solve different type instruction
+      switch (curII->getOpcode()) {
+      case llvm::Instruction::Load: {
+        LoadInst *linst = dyn_cast<LoadInst>(curII);
+        Value *loadValPtr = linst->getPointerOperand();
+        mapping(loadValPtr, curII);
+        break;
+      }
+      case llvm::Instruction::Store: {
+        StoreInst *sinst = dyn_cast<StoreInst>(curII);
+        Value *storeValPtr = sinst->getPointerOperand();
+        Value *storeVal = sinst->getValueOperand();
+        mapping(storeVal, curII);
+        mapping(curII, storeValPtr);
+        break;
+      }
+      default: {
+        for (Instruction::op_iterator op = curII->op_begin(),
+                                      opEnd = curII->op_end();
+             op != opEnd; ++op) {
+          if (dyn_cast<Instruction>(*op)) {
+            mapping(*op, curII);
+          }
+        }
+        break;
+      }
+      }
+    }
+  }
+
+  PLOG_INFO_IF(gConfig.severity.info)
+      << "DFG Build Done with " << id << " instructions";
+  // just output test
+  /*
+  for (int i = 0; i <= id; i++) {
+    for (int j = 0; j <= id; j++) {
+      errs() << pInsMap[i][j];
+    }
+    errs() << "\n";
+  }
+  */
+  return false;
 }
 
 bool DataFlow::Analysis::drawDataFlowGraph(Function &F) {
@@ -249,6 +335,10 @@ bool DataFlow::Analysis::drawDataFlowGraph(Function &F) {
     std::string instruction;
     if (dyn_cast<Instruction>(node->first)) {
       llvm::raw_string_ostream(instruction) << *(node->first);
+      // eliminate llvm.dbg.* instructions, just for view
+      if (instruction.find("llvm.dbg") != std::string::npos) {
+        continue;
+      }
       file << "\tNode" << node->first << "[shape=record, label=\"" << lineNum
            << ":" << colNum << " " << EscapeString(instruction) << "\"];\n";
     } else { // 如果不是指令，那么就是常量
@@ -259,12 +349,14 @@ bool DataFlow::Analysis::drawDataFlowGraph(Function &F) {
   }
 
   // 将inst_edges边dump
+  /*
   for (edge_list::iterator edge = inst_edges.begin(),
                            edge_end = inst_edges.end();
        edge != edge_end; ++edge) {
     file << "\tNode" << edge->first.first << " -> Node" << edge->second.first
          << "\n";
   }
+  */
   // 将data flow的边dump
   file << "edge [color=red]"
        << "\n";
@@ -291,8 +383,42 @@ DataFlow::Result DataFlow::run(Function &F, FunctionAnalysisManager &AM) {
   A->initVarMap(F);
   if (gConfig.drawDFG)
     A->drawDataFlowGraph(F);
+  A->buildDFG(F);
+
+  // do copy
+  Result.pId2Ins = A->pId2Ins;
+  Result.pIns2Id = A->pIns2Id;
+  Result.pInsMap = A->pInsMap;
+  Result.pVarMap = A->varMap;
+  Result.pF = &F;
+  Result.valid = true;
 
   return Result;
 }
+
+dataFlowInconsistencyAnalysis::dataFlowInconsistencyAnalysis() {}
+
+void dataFlowInconsistencyAnalysis::Wrapper(
+    std::vector<AnalyzedDataFlowInfo> *IRFile1FuncAnalysis,
+    std::vector<AnalyzedDataFlowInfo> *IRFIle2FuncAnalysis,
+    StringRef targetFunc) {
+  for (int i = 0; i < IRFile1FuncAnalysis->size(); i++) {
+    for (int j = 0; j < IRFIle2FuncAnalysis->size(); j++) {
+      AnalyzedDataFlowInfo info1 = IRFile1FuncAnalysis->at(i);
+      AnalyzedDataFlowInfo info2 = IRFIle2FuncAnalysis->at(j);
+      if (info1.pF->getName().equals(info2.pF->getName()) &&
+          info1.pF->getName().equals(
+              targetFunc)) { // match same function in two modules
+        // begin analysis
+        match(info1, info2);
+
+        // diffCallInstanceInBB(info1, info2);
+      }
+    }
+  }
+}
+
+void dataFlowInconsistencyAnalysis::match(AnalyzedDataFlowInfo info1,
+                                          AnalyzedDataFlowInfo info2) {}
 
 } // namespace llvm

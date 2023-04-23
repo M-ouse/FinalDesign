@@ -115,6 +115,12 @@ bool doDataFlowAnalysis(FunctionAnalysisManager &FAM,
   getDataFlowAnalysisResult(M1, IRFile1FuncAnalysis);
   getDataFlowAnalysisResult(M2, IRFile2FuncAnalysis);
 
+  PLOG_INFO_IF(gConfig.severity.info) << "Starting Dataflow match"
+                                      << " ... ...?";
+  dataFlowInconsistencyAnalysis *result = new dataFlowInconsistencyAnalysis();
+  StringRef targetFunc = gConfig.targetFunction;
+  result->Wrapper(IRFile1FuncAnalysis, IRFile2FuncAnalysis, targetFunc);
+
   return true;
 }
 
