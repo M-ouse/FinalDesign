@@ -315,11 +315,11 @@ void controlFlowInconsistencyAnalysis::Wrapper(
 void controlFlowInconsistencyAnalysis::match(AnalyzedControlFlowInfo info1,
                                              AnalyzedControlFlowInfo info2) {
   PLOG_DEBUG_IF(gConfig.severity.debug)
-      << "Matching " << info1.pF->getName() << "\n";
+      << "CFG Matching " << info1.pF->getName() << "\n";
   std::map<int, std::pair<int, float>> *_tMatchMap =
-      new std::map<int, std::pair<int, float>>;
+      new std::map<int, std::pair<int, float>>();
   std::map<int, std::pair<int, float>> *_reverseMatchMap =
-      new std::map<int, std::pair<int, float>>;
+      new std::map<int, std::pair<int, float>>();
 
   PLOG_DEBUG_IF(gConfig.severity.debug)
       << "\n"

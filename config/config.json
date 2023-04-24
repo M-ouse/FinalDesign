@@ -2,7 +2,7 @@
     "IRFile1": "./input/demo.ll",
     "IRFile2": "./input/demo1.ll",
     "targetFunction": "usep",
-    "AnalysisCFG" : false,
+    "AnalysisCFG" : true,
     "drawCFG": false,
     "AnalysisDFG" : true,
     "drawDFG": false,
@@ -12,7 +12,7 @@
         "error": false,
         "warning": false,
         "info": true,
-        "debug": true,
+        "debug": false,
         "verbose": false
     }
 }

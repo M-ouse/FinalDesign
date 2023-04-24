@@ -30,6 +30,7 @@ public:
   std::map<Instruction *, int> *pIns2Id; // ins - id
   int (*pInsMap)[maxInsCount];
   std::map<llvm::Value *, std::string> *pVarMap;
+  int instCount;
 
   Function *pF;
   bool valid = false;
@@ -60,6 +61,7 @@ public:
     int (*pInsMap)[maxInsCount];
     std::map<int, llvm::Instruction *> *pId2Ins; // id - ins
     std::map<llvm::Instruction *, int> *pIns2Id; // ins - id
+    int instCount;
 
     Analysis();
     StringRef getValueName(Value *v);
@@ -78,10 +80,18 @@ public:
 };
 
 class dataFlowInconsistencyAnalysis {
+  std::map<int, std::pair<int, float>> *matchMap;
+  bool M1visited[maxInsCount];
+  bool M2visited[maxInsCount];
+
 public:
   dataFlowInconsistencyAnalysis();
   void Wrapper(std::vector<AnalyzedDataFlowInfo> *,
                std::vector<AnalyzedDataFlowInfo> *, StringRef);
   void match(AnalyzedDataFlowInfo, AnalyzedDataFlowInfo);
+  float seqLCS(std::string, std::string);
+  std::string op2realname(AnalyzedDataFlowInfo,llvm::Value*,llvm::Instruction*);
+  void initialInconsistencyDetect(AnalyzedDataFlowInfo, AnalyzedDataFlowInfo);
+  
 };
 } // namespace llvm

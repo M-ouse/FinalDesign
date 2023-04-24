@@ -151,6 +151,7 @@ DataFlow::Analysis::Analysis() {
   pId2Ins = new std::map<int, llvm::Instruction *>();
   pIns2Id = new std::map<llvm::Instruction *, int>();
   varMap = new std::map<llvm::Value *, std::string>();
+  instCount = 0;
 }
 
 bool DataFlow::Analysis::buildDFG(Function &F) {
@@ -228,15 +229,7 @@ bool DataFlow::Analysis::buildDFG(Function &F) {
 
   PLOG_INFO_IF(gConfig.severity.info)
       << "DFG Build Done with " << id << " instructions";
-  // just output test
-  /*
-  for (int i = 0; i <= id; i++) {
-    for (int j = 0; j <= id; j++) {
-      errs() << pInsMap[i][j];
-    }
-    errs() << "\n";
-  }
-  */
+  instCount = id;
   return false;
 }
 
@@ -339,9 +332,11 @@ bool DataFlow::Analysis::drawDataFlowGraph(Function &F) {
       if (instruction.find("llvm.dbg") != std::string::npos) {
         continue;
       }
-      file << "\tNode" << node->first << "[shape=record, label=\"" << lineNum
-           << ":" << colNum << " " << EscapeString(instruction) << "\"];\n";
-    } else { // 如果不是指令，那么就是常量
+      llvm::Instruction *tmpI = dyn_cast<Instruction>(node->first);
+      file << "\tNode" << node->first << "[shape=record, label=\""
+           << pIns2Id->at(tmpI) << "," << lineNum << ":" << colNum << " "
+           << EscapeString(instruction) << "\"];\n";
+    } else { // 如果不是指令，那么就是常量, useless
       llvm::raw_string_ostream(instruction) << node->second;
       file << "\tNode" << node->first << "[shape=record, label=\"" << lineNum
            << ":" << colNum << " " << EscapeString(instruction) << "\"];\n";
@@ -381,9 +376,9 @@ DataFlow::Result DataFlow::run(Function &F, FunctionAnalysisManager &AM) {
   Analysis *A = new Analysis();
 
   A->initVarMap(F);
+  A->buildDFG(F);
   if (gConfig.drawDFG)
     A->drawDataFlowGraph(F);
-  A->buildDFG(F);
 
   // do copy
   Result.pId2Ins = A->pId2Ins;
@@ -392,11 +387,16 @@ DataFlow::Result DataFlow::run(Function &F, FunctionAnalysisManager &AM) {
   Result.pVarMap = A->varMap;
   Result.pF = &F;
   Result.valid = true;
+  Result.instCount = A->instCount;
 
   return Result;
 }
 
-dataFlowInconsistencyAnalysis::dataFlowInconsistencyAnalysis() {}
+dataFlowInconsistencyAnalysis::dataFlowInconsistencyAnalysis() {
+  matchMap = new std::map<int, std::pair<int, float>>();
+  memset(M1visited, false, sizeof(M1visited));
+  memset(M2visited, false, sizeof(M2visited));
+}
 
 void dataFlowInconsistencyAnalysis::Wrapper(
     std::vector<AnalyzedDataFlowInfo> *IRFile1FuncAnalysis,
@@ -411,6 +411,7 @@ void dataFlowInconsistencyAnalysis::Wrapper(
               targetFunc)) { // match same function in two modules
         // begin analysis
         match(info1, info2);
+        initialInconsistencyDetect(info1, info2);
 
         // diffCallInstanceInBB(info1, info2);
       }
@@ -419,6 +420,154 @@ void dataFlowInconsistencyAnalysis::Wrapper(
 }
 
 void dataFlowInconsistencyAnalysis::match(AnalyzedDataFlowInfo info1,
-                                          AnalyzedDataFlowInfo info2) {}
+                                          AnalyzedDataFlowInfo info2) {
+  PLOG_DEBUG_IF(gConfig.severity.debug)
+      << "DFG Matching " << info1.pF->getName();
+  std::map<int, std::pair<int, float>> *_tMatchMap =
+      new std::map<int, std::pair<int, float>>();
+  std::map<int, std::pair<int, float>> *_reverseMatchMap =
+      new std::map<int, std::pair<int, float>>();
+
+  PLOG_DEBUG_IF(gConfig.severity.debug)
+      << "\n"
+      << info1.pF->getName() << " "
+      << "inst count: " << info1.instCount << "\n"
+      << info2.pF->getName() << " "
+      << "inst count: " << info2.instCount;
+
+  for (int i_Inst = 0; i_Inst < info1.instCount; i_Inst++) {
+    for (int j_Inst = 0; j_Inst < info2.instCount; j_Inst++) {
+      std::string seq1, seq2;
+      auto toSeq = [](Instruction *I) {
+        std::string seq;
+        llvm::raw_string_ostream(seq) << *I;
+        return seq;
+      };
+      seq1 = toSeq(info1.pId2Ins->at(i_Inst));
+      seq2 = toSeq(info2.pId2Ins->at(j_Inst));
+      float ratio = seqLCS(seq1, seq2);
+      if (_tMatchMap->find(i_Inst) == _tMatchMap->end()) {
+        _tMatchMap->insert(std::pair<int, std::pair<int, float>>(
+            i_Inst, std::pair<int, float>(j_Inst, ratio)));
+      } else {
+        if (ratio > _tMatchMap->at(i_Inst).second) {
+          _tMatchMap->at(i_Inst).first = j_Inst;
+          _tMatchMap->at(i_Inst).second = ratio;
+        }
+      }
+    }
+  }
+
+  // a reverse map, to de duplicate
+  for (auto iter = _tMatchMap->begin(); iter != _tMatchMap->end(); iter++) {
+    if (_reverseMatchMap->find(iter->second.first) == _reverseMatchMap->end()) {
+      _reverseMatchMap->insert(std::pair<int, std::pair<int, float>>(
+          iter->second.first,
+          std::pair<int, float>(iter->first, iter->second.second)));
+    } else {
+      if (iter->second.second >
+          _reverseMatchMap->at(iter->second.first).second) {
+        _reverseMatchMap->at(iter->second.first).first = iter->first;
+        _reverseMatchMap->at(iter->second.first).second = iter->second.second;
+      }
+    }
+  }
+
+  for (auto iter = _reverseMatchMap->begin(); iter != _reverseMatchMap->end();
+       iter++) {
+    matchMap->insert(std::pair<int, std::pair<int, float>>(
+        iter->second.first,
+        std::pair<int, float>(iter->first, iter->second.second)));
+    M1visited[iter->second.first] = true;
+    M2visited[iter->first] = true;
+  }
+
+  // traverse matchMap
+  for (auto iter = matchMap->begin(); iter != matchMap->end(); iter++) {
+    PLOG_DEBUG_IF(gConfig.severity.debug)
+        << "match: " << iter->first << " " << iter->second.first << " "
+        << iter->second.second;
+  }
+
+  delete _tMatchMap;
+  delete _reverseMatchMap;
+}
+
+float dataFlowInconsistencyAnalysis::seqLCS(std::string seq1,
+                                            std::string seq2) {
+
+  int len1 = seq1.length(), len2 = seq2.length();
+  std::vector<std::vector<int>> dp(len1 + 1, std::vector<int>(len2 + 1, 0));
+  for (int i = 1; i <= len1; ++i) {
+    for (int j = 1; j <= len2; ++j) {
+      if (seq1[i - 1] == seq2[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1] + 1;
+      } else {
+        dp[i][j] = std::max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+  }
+  int lcs = dp[len1][len2];
+  return 2.0 * lcs / (len1 + len2);
+  // errs() << instruction << "\n";
+}
+
+std::string dataFlowInconsistencyAnalysis::op2realname(
+    AnalyzedDataFlowInfo info, llvm::Value *V, llvm::Instruction *I) {
+
+  if (I) {
+    unsigned lineNum = 0;
+    unsigned colNum = 0;
+    std::string varName = "";
+    const DebugLoc &location = I->getDebugLoc();
+    if (location) {
+      lineNum = location.getLine();
+      colNum = location.getCol();
+    }
+    if (V) {
+      if (info.pVarMap->find(V) != info.pVarMap->end()) {
+        varName = info.pVarMap->at(V);
+      }
+    }
+    PLOG_FATAL_IF(gConfig.severity.fatal)
+        << "line: " << lineNum << " col: " << colNum << ", op's realname is "
+        << varName;
+  }
+  return "";
+}
+
+void dataFlowInconsistencyAnalysis::initialInconsistencyDetect(
+    AnalyzedDataFlowInfo info1, AnalyzedDataFlowInfo info2) {
+  int len1 = info1.instCount, len2 = info2.instCount;
+
+  auto dump = [this](AnalyzedDataFlowInfo info, llvm::Instruction *I) {
+    bool output = false;
+    for (Instruction::op_iterator op = I->op_begin(), opEnd = I->op_end();
+         op != opEnd; ++op) {
+      if (dyn_cast<Instruction>(*op)) {
+        op2realname(info, *op, I);
+        output = true;
+      }
+    }
+    if (!output) {
+      op2realname(info, nullptr, I);
+    }
+  };
+
+  for (int i = 0; i < len1; i++) {
+    if (!M1visited[i]) {
+      PLOG_DEBUG_IF(gConfig.severity.debug) << "M1 unvisited: " << i;
+      llvm::Instruction *I = info1.pId2Ins->at(i);
+      dump(info1, I);
+    }
+  }
+  for (int i = 0; i < len2; i++) {
+    if (!M2visited[i]) {
+      PLOG_DEBUG_IF(gConfig.severity.debug) << "M2 unvisited: " << i;
+      llvm::Instruction *I = info2.pId2Ins->at(i);
+      dump(info2, I);
+    }
+  }
+}
 
 } // namespace llvm
