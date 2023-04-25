@@ -1,0 +1,66 @@
+From 26dcbc800035f2037286c73bae9a6dc79235898a Mon Sep 17 00:00:00 2001
+From: Qinrun Dai <flno@hust.edu.cn>
+Date: Mon, 20 Mar 2023 04:35:13 +0000
+Subject: [PATCH] drivers: clocksource: fix memory leak in davinci_timer_register
+
+Smatch reports:
+drivers/clocksource/timer-davinci.c:332 davinci_timer_register()
+warn: 'base' from ioremap() not released on lines: 274.
+
+Fix this by defining a unified function exit
+to iounmap 'base' and return corresponding value.
+
+Fixes: 721154f972aa ("clocksource/drivers/davinci: Add support for clockevents")
+Signed-off-by: Qinrun Dai <flno@hust.edu.cn>
+---
+ drivers/clocksource/timer-davinci.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/clocksource/timer-davinci.c b/drivers/clocksource/timer-davinci.c
+index 9996c0542520..a6dd1da9e6d1 100644
+--- a/drivers/clocksource/timer-davinci.c
++++ b/drivers/clocksource/timer-davinci.c
+@@ -270,8 +270,10 @@ int __init davinci_timer_register(struct clk *clk,
+ 	tick_rate = clk_get_rate(clk);
+ 
+ 	clockevent = kzalloc(sizeof(*clockevent), GFP_KERNEL);
+-	if (!clockevent)
+-		return -ENOMEM;
++	if (!clockevent) {
++		rv = -ENOMEM;
++		goto iounmap_base;
++	}
+ 
+ 	clockevent->dev.name = "tim12";
+ 	clockevent->dev.features = CLOCK_EVT_FEAT_ONESHOT;
+@@ -296,7 +298,7 @@ int __init davinci_timer_register(struct clk *clk,
+ 			 "clockevent/tim12", clockevent);
+ 	if (rv) {
+ 		pr_err("Unable to request the clockevent interrupt\n");
+-		return rv;
++		goto iounmap_base;
+ 	}
+ 
+ 	davinci_clocksource.dev.rating = 300;
+@@ -323,13 +325,17 @@ int __init davinci_timer_register(struct clk *clk,
+ 	rv = clocksource_register_hz(&davinci_clocksource.dev, tick_rate);
+ 	if (rv) {
+ 		pr_err("Unable to register clocksource\n");
+-		return rv;
++		goto iounmap_base;
+ 	}
+ 
+ 	sched_clock_register(davinci_timer_read_sched_clock,
+ 			     DAVINCI_TIMER_CLKSRC_BITS, tick_rate);
+ 
+ 	return 0;
++
++iounmap_base:
++	iounmap(base);
++	return rv;
+ }
+ 
+ static int __init of_davinci_timer_register(struct device_node *np)
+-- 
+2.37.2
+

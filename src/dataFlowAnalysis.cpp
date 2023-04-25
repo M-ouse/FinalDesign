@@ -529,8 +529,8 @@ std::string dataFlowInconsistencyAnalysis::op2realname(
         varName = info.pVarMap->at(V);
       }
     }
-    PLOG_FATAL_IF(gConfig.severity.fatal)
-        << "line: " << lineNum << " col: " << colNum << ", op's realname is "
+    PLOG_FATAL_IF(gConfig.severity.fatal) << "Module: " << I->getModule()->getName().str()
+        << " line: " << lineNum << " col: " << colNum << ", op's realname is "
         << varName;
   }
   return "";

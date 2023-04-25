@@ -1,9 +1,9 @@
 {
-    "IRFile1": "./input/demo.ll",
-    "IRFile2": "./input/demo1.ll",
-    "targetFunction": "usep",
+    "IRFile1": "./input/slcan-lts.bc",
+    "IRFile2": "./input/slcan-ups.ll",
+    "targetFunction": "slc_sync",
     "AnalysisCFG" : true,
-    "drawCFG": false,
+    "drawCFG": true,
     "AnalysisDFG" : true,
     "drawDFG": false,
     "Severity": {
