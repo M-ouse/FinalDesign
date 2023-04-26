@@ -9,3 +9,5 @@ stool
 result
 output/
 input/
+./python_scripts/ir_files
+./python_scripts/diff_test
