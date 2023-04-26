@@ -530,7 +530,7 @@ std::string dataFlowInconsistencyAnalysis::op2realname(
       }
     }
     PLOG_FATAL_IF(gConfig.severity.fatal) << "Module: " << I->getModule()->getName().str()
-        << " line: " << lineNum << " col: " << colNum << ", op's realname is "
+        << " line: " << lineNum << " col: " << colNum << ", op's realname is: "
         << varName;
   }
   return "";

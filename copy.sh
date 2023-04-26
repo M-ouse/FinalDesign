@@ -1,0 +1,1 @@
+cp ./stool /home/secondst/linux/working/llvm_tool

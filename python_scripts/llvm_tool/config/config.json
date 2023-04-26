@@ -1,0 +1,18 @@
+{
+    "IRFile1": "./input/slcan_lts.ll",
+    "IRFile2": "./input/slcan_ups.ll",
+    "targetFunction": "slc_free_netdev",
+    "AnalysisCFG": true,
+    "drawCFG": false,
+    "AnalysisDFG": true,
+    "drawDFG": false,
+    "Severity": {
+        "none": false,
+        "fatal": true,
+        "error": false,
+        "warning": false,
+        "info": false,
+        "debug": false,
+        "verbose": false
+    }
+}

@@ -1,0 +1,18 @@
+{
+    "IRFile1": "IR1path",
+    "IRFile2": "IR2 path",
+    "targetFunction": "targetFunction",
+    "AnalysisCFG" : false,
+    "drawCFG": false,
+    "AnalysisDFG" : false,
+    "drawDFG": false,
+    "Severity": {
+        "none": false,
+        "fatal": false,
+        "error": false,
+        "warning": false,
+        "info": false,
+        "debug": false,
+        "verbose": false
+    }
+}
